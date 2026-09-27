@@ -1,0 +1,283 @@
+name: RuneLite upstream update
+
+on:
+  schedule:
+    # Avoid the top of the hour, when scheduled GitHub Actions can be busier.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: runelite-upstream-update
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check RuneLite production version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out HapticScape
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: gradle
+
+      - name: Detect RuneLite version
+        id: versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT="$(sed -n 's/^runeLiteVersion=\([0-9][0-9.]*\)$/\1/p' runelite-bridge-client/RUNTIME.properties)"
+
+          if [[ -z "$CURRENT" ]]; then
+            echo "Could not find runeLiteVersion in runelite-bridge-client/RUNTIME.properties." >&2
+            exit 1
+          fi
+
+          BOOTSTRAP="${RUNNER_TEMP}/runelite-bootstrap.json"
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --retry 3 \
+            --retry-delay 2 \
+            https://static.runelite.net/bootstrap.json \
+            --output "$BOOTSTRAP"
+
+          LATEST="$(
+            python3 - "$BOOTSTRAP" <<'PY'
+          import json
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "r", encoding="utf-8") as handle:
+              bootstrap = json.load(handle)
+
+          versions = []
+          for artifact in bootstrap.get("artifacts", []):
+              name = artifact.get("name", "")
+              match = re.fullmatch(r"client-(\d+\.\d+\.\d+)\.jar", name)
+              if match:
+                  versions.append(match.group(1))
+
+          if len(versions) != 1:
+              raise SystemExit(
+                  f"Expected exactly one RuneLite client artifact, found {versions!r}"
+              )
+
+          print(versions[0])
+          PY
+          )"
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CURRENT" == "$LATEST" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "HapticScape already targets RuneLite $CURRENT."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "RuneLite update detected: $CURRENT -> $LATEST"
+          fi
+
+      - name: Check for an existing update PR
+        if: steps.versions.outputs.changed == 'true'
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="automation/runelite-${LATEST}"
+          PR_URL="$(
+            gh pr list \
+              --state open \
+              --head "$BRANCH" \
+              --json url \
+              --jq '.[0].url // ""'
+          )"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$PR_URL" ]]; then
+            echo "An update PR already exists: $PR_URL"
+          fi
+
+      - name: Update LumBridge RuneLite version
+        if: steps.versions.outputs.changed == 'true' && steps.existing.outputs.url == ''
+        shell: bash
+        env:
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          python3 - "$LATEST" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          latest = sys.argv[1]
+          path = Path("runelite-bridge-client/RUNTIME.properties")
+          original = path.read_text(encoding="utf-8")
+
+          updated, replacements = re.subn(
+              r"(?m)^runeLiteVersion=[0-9]+(?:\.[0-9]+)*$",
+              f"runeLiteVersion={latest}",
+              original,
+              count=1,
+          )
+
+          if replacements != 1:
+              raise SystemExit(
+                  f"Expected to update runeLiteVersion exactly once; updated {replacements} times"
+              )
+
+          path.write_text(updated, encoding="utf-8")
+          PY
+
+          git diff --check
+          git diff -- runelite-bridge-client/RUNTIME.properties
+
+      - name: Validate updated client
+        if: steps.versions.outputs.changed == 'true' && steps.existing.outputs.url == ''
+        id: validation
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+
+          ./gradlew \
+            --no-daemon \
+            clean \
+            test \
+            verifyStandaloneArtifact \
+            collectRuntimeLicenses \
+            :runelite-bridge-client:test \
+            :runelite-bridge-client:verifyBridgeClientJar \
+            :runelite-bridge-client:collectRuntimeLicenses
+
+      - name: Push update branch
+        if: steps.versions.outputs.changed == 'true' && steps.existing.outputs.url == ''
+        id: push
+        shell: bash
+        env:
+          LATEST: ${{ steps.versions.outputs.latest }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$BRANCH"
+          git add runelite-bridge-client/RUNTIME.properties
+          git commit -m "chore: update RuneLite to ${LATEST}"
+
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+      - name: Open update pull request
+        if: steps.versions.outputs.changed == 'true' && steps.existing.outputs.url == ''
+        id: pull_request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT: ${{ steps.versions.outputs.current }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          VALIDATION: ${{ steps.validation.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$VALIDATION" == "success" ]]; then
+            VALIDATION_TEXT="✅ Automated compatibility checks passed."
+          else
+            VALIDATION_TEXT="❌ Automated compatibility checks failed. Do not merge until the RuneLite API/dependency changes are reviewed."
+          fi
+
+          BODY="${RUNNER_TEMP}/runelite-update-pr.md"
+          cat > "$BODY" <<EOF
+          RuneLite's production bootstrap now points to **${LATEST}**. HapticScape currently targets **${CURRENT}**.
+
+          This PR updates only \`runeLiteVersion\` in \`runelite-bridge-client/RUNTIME.properties\`.
+
+          ${VALIDATION_TEXT}
+
+          The updater workflow ran:
+
+          - \`clean\`
+          - \`test\`
+          - \`verifyStandaloneArtifact\`
+          - \`:runelite-bridge-client:test\`
+          - \`:runelite-bridge-client:verifyBridgeClientJar\`
+          - \`:runelite-bridge-client:collectRuntimeLicenses\`
+          - \`collectRuntimeLicenses\`
+
+          Workflow run: ${RUN_URL}
+
+          Before merging, launch LumBridge and HapticScape together and smoke test startup, bridge event delivery, the HapticScape panel, Intiface connection, and clicker output.
+          EOF
+
+          PR_URL="$(
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH" \
+              --title "chore: update RuneLite to ${LATEST}" \
+              --body-file "$BODY"
+          )"
+
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Opened $PR_URL"
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        env:
+          CURRENT: ${{ steps.versions.outputs.current }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+          CHANGED: ${{ steps.versions.outputs.changed }}
+          EXISTING_PR: ${{ steps.existing.outputs.url }}
+          NEW_PR: ${{ steps.pull_request.outputs.url }}
+          VALIDATION: ${{ steps.validation.outcome }}
+        run: |
+          {
+            echo "## RuneLite update check"
+            echo
+            echo "- HapticScape pin: \`${CURRENT:-unknown}\`"
+            echo "- RuneLite production: \`${LATEST:-unknown}\`"
+
+            if [[ "${CHANGED:-false}" != "true" ]]; then
+              echo "- Result: already current"
+            elif [[ -n "${EXISTING_PR:-}" ]]; then
+              echo "- Result: update PR already open"
+              echo "- PR: ${EXISTING_PR}"
+            else
+              echo "- Validation: \`${VALIDATION:-unknown}\`"
+              echo "- PR: ${NEW_PR:-not created}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail after opening PR when compatibility checks fail
+        if: steps.versions.outputs.changed == 'true' && steps.existing.outputs.url == '' && steps.validation.outcome != 'success'
+        shell: bash
+        run: |
+          echo "The RuneLite update PR was opened, but compatibility checks failed." >&2
+          exit 1
