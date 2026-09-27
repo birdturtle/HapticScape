@@ -73,7 +73,7 @@ try
 	Copy-Item (Join-Path $projectRoot 'LICENSE') (Join-Path $licensesDirectory 'HapticScape.txt')
 	Copy-Item (Join-Path $projectRoot 'licenses\*') $licensesDirectory -Recurse
 	Copy-Item (Join-Path $projectRoot 'build\generated\runtime-licenses') (Join-Path $licensesDirectory 'resolved-artifacts') -Recurse
-	Copy-Item (Join-Path $projectRoot 'FRIEND-SETUP.md') (Join-Path $appDirectory 'README-FIRST.md')
+	Copy-Item (Join-Path $projectRoot 'README.md') (Join-Path $appDirectory 'README-FIRST.md')
 
 	$jlinkCandidates = @()
 	if (-not [string]::IsNullOrWhiteSpace($env:HAPTICSCAPE_JAVA_HOME))
