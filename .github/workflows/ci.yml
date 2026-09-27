@@ -79,7 +79,7 @@ jobs:
 
       - name: Build both release ZIPs
         shell: pwsh
-        run: .\\package-all.ps1 -Version 0.0.0-ci
+        run: .\package-all.ps1 -Version 0.0.0-ci
 
       - name: Upload Windows package candidates
         uses: actions/upload-artifact@v4
