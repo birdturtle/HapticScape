@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -246,6 +247,17 @@ jobs:
 
           echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
           echo "Opened $PR_URL"
+
+      - name: Run required CI for update PR
+        if: steps.pull_request.outputs.url != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+        run: |
+          set -euo pipefail
+          gh workflow run ci.yml --ref "$BRANCH"
+          echo "Dispatched CI on $BRANCH for the required status check."
 
       - name: Write summary
         if: always()
