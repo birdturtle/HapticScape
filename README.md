@@ -741,7 +741,7 @@ Get-Content .\runelite-bridge-client\RUNTIME.properties
 Get-Content .\build\bridge-windows-package\LumBridge\app\release.json
 ```
 
-The packager rejects a missing or different tag, a dirty checkout, and a RuneLite version override for release builds. Confirm `runeLiteVersion` in the generated `release.json` before uploading the ZIPs.
+The packager rejects a missing or different tag, a dirty checkout, and a RuneLite version override for release builds. A push of the version tag also runs the Windows CI job against that tag; its `hapticscape-windows-packages-<commit>` artifact contains all four versioned release files. Confirm `runeLiteVersion` in LumBridge's `app/release.json` inside the ZIP, then upload the ZIPs and their checksums from that CI artifact (or a verified local tag build). Use a new patch version when correcting an already published release so existing installations receive the update.
 
 The output is written under `build\distribution`:
 
