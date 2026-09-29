@@ -731,11 +731,17 @@ The sync script expects a clean local bridge repository and records the exact so
 
 ## Build Windows release packages
 
-Build HapticScape and LumBridge together, as separate ZIPs:
+Create the `vX.Y.Z` tag on the release commit before packaging. On Windows, check out that exact tag and build HapticScape and LumBridge together:
 
 ```powershell
+git fetch origin --tags
+git switch --detach vX.Y.Z
+Get-Content .\runelite-bridge-client\RUNTIME.properties
 .\package-all.ps1 -Version X.Y.Z
+Get-Content .\build\bridge-windows-package\LumBridge\app\release.json
 ```
+
+The packager rejects a missing or different tag, a dirty checkout, and a RuneLite version override for release builds. Confirm `runeLiteVersion` in the generated `release.json` before uploading the ZIPs.
 
 The output is written under `build\distribution`:
 
