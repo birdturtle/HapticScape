@@ -17,6 +17,41 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $desktopPackager = Join-Path $projectRoot 'package-windows.ps1'
 $bridgePackager = Join-Path $projectRoot 'package-bridge-client.ps1'
 
+# Public release packages must come from the exact source commit named by
+# their tag. CI's disposable 0.0.0-ci build deliberately has no release tag.
+if ($Version -ne '0.0.0-ci')
+{
+    if (-not [string]::IsNullOrWhiteSpace($RuneLiteVersion))
+    {
+        throw 'Release packages use the RuneLite version pinned in RUNTIME.properties. Do not override it.'
+    }
+
+    $tag = "v$Version"
+    $tagCommit = & git -C $projectRoot rev-parse --verify "refs/tags/$tag^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $tagCommit)
+    {
+        throw "Tag $tag was not found. Create the release tag before packaging."
+    }
+
+    $headCommit = & git -C $projectRoot rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or -not $headCommit)
+    {
+        throw 'Could not identify the source commit for this package.'
+    }
+    if ($headCommit.Trim() -ne $tagCommit.Trim())
+    {
+        throw "The checkout is at $($headCommit.Trim()), but $tag points to $($tagCommit.Trim()). Check out $tag before packaging."
+    }
+
+    $changes = & git -C $projectRoot status --porcelain
+    if ($LASTEXITCODE -ne 0 -or $changes)
+    {
+        throw 'The release checkout has uncommitted or untracked changes. Package from a clean tag checkout.'
+    }
+
+    Write-Host "Packaging $tag from $($tagCommit.Trim())."
+}
+
 if (-not (Test-Path $desktopPackager -PathType Leaf))
 {
     throw "Desktop packaging script was not found: $desktopPackager"
