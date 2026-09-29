@@ -26,12 +26,21 @@ public final class RuneLiteLootEventAdapter
 		for (ItemStack item : items)
 		{
 			ItemStack required = Objects.requireNonNull(item, "item");
-			int unitPrice = Math.max(0, itemManager.getItemPrice(required.getId()));
+			long unitPrice = Math.max(0L, itemManager.getItemPrice(required.getId()));
 			int quantity = Math.max(0, required.getQuantity());
-			totalValue = saturatedAdd(totalValue, (long) unitPrice * quantity);
+			totalValue = saturatedAdd(totalValue, saturatedMultiply(unitPrice, quantity));
 			stackCount++;
 		}
 		return new LootReceivedEvent(SOURCE, stackCount, totalValue);
+	}
+
+	static long saturatedMultiply(long unitPrice, int quantity)
+	{
+		if (quantity > 0 && unitPrice > Long.MAX_VALUE / quantity)
+		{
+			return Long.MAX_VALUE;
+		}
+		return unitPrice * quantity;
 	}
 
 	static long saturatedAdd(long left, long right)
