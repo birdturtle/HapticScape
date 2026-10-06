@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HapticScape Launcher</title><link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><img src="assets/hapticscape.png" alt=""><div><strong>HapticScape</strong><small>Launcher</small></div></div>
+    <nav aria-label="Main navigation">
+      <button class="nav-button active" data-page="home">Home</button>
+      <button class="nav-button" data-page="updates">Updates</button>
+      <button class="nav-button" data-page="settings">Settings</button>
+    </nav>
+    <div class="sidebar-bottom" id="platform">Desktop</div>
+  </aside>
+  <main>
+    <header class="topbar"><h1 id="page-name">Home</h1><span class="version">0.1.0</span></header>
+    <div class="content">
+      <section class="page" id="home">
+        <article class="launch-panel" aria-labelledby="launch-title">
+          <div class="launch-background" aria-hidden="true"></div>
+          <div class="launch-content">
+            <div class="launch-title"><img src="assets/lumbridge.png" alt=""><div><h2 id="launch-title">LumBridge</h2><p>RuneLite with HapticScape</p></div></div>
+            <div class="account-controls">
+              <section class="selection-group account-group" aria-labelledby="accounts-heading">
+                <div class="selection-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3"/></svg><h3 id="accounts-heading">Jagex accounts</h3></div>
+                <label for="accounts">Account</label>
+                <select id="accounts"><option value="">No accounts added</option></select>
+                <div class="account-management"><button class="button" id="sign-in">Add account</button><span id="account-actions" hidden><button class="button remove-button" id="remove-account" aria-label="Remove selected Jagex account">Remove</button></span><button class="button" id="cancel-login" hidden>Cancel sign-in</button></div>
+                <p class="inline-status" id="account-message" role="status"></p>
+              </section>
+              <section class="selection-group character-group" aria-labelledby="characters-heading">
+                <div class="selection-heading"><img src="assets/lumbridge.png" alt=""><h3 id="characters-heading">Characters</h3></div>
+                <div id="characters" class="character-list" role="group" aria-label="Characters on the selected account"></div>
+                <div class="play-controls"><p class="play-hint" id="play-hint">Add an account to play.</p><button class="button primary" id="play" disabled>Play</button></div>
+              </section>
+            </div>
+          </div>
+        </article>
+        <div class="app-grid">
+          <article class="app-card"><img class="app-icon" src="assets/hapticscape.png" alt=""><div class="app-info"><h2>HapticScape</h2><p class="app-status" id="haptic-status">Checking installation…</p></div><button class="button" id="open-haptic">Open</button></article>
+          <article class="app-card"><img class="app-icon" src="assets/lumbridge.png" alt=""><div class="app-info"><h2>LumBridge</h2><p class="app-status" id="lumbridge-status">Checking installation…</p></div><span class="companion-note">Starts with Play</span></article>
+        </div>
+        <p class="help-text">Play starts both apps. You can open HapticScape on its own.</p>
+      </section>
+      <section class="page" id="updates" hidden>
+        <article class="panel"><div class="panel-heading"><h2>HapticScape releases</h2><button class="button" id="check-updates">Check for updates</button></div><p id="release-summary">Check the latest published release.</p><h3 id="release-name" hidden></h3><pre id="release-notes" hidden></pre></article>
+        <p class="help-text">Update installation is not available in this build.</p>
+      </section>
+      <section class="page" id="settings" hidden>
+        <form class="panel preferences-form" id="preferences-form">
+          <h2>Launch behavior</h2>
+          <label class="preference-row"><input type="checkbox" name="minimizeOnPlay"><span>Minimize the launcher after Play</span></label>
+          <h2>Updates</h2>
+          <label class="preference-row"><input type="checkbox" name="checkUpdatesOnStartup"><span>Check for updates when the launcher opens</span></label>
+          <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
+        </form>
+        <p class="help-text">Closing the launcher leaves HapticScape and LumBridge running.</p>
+        <details class="troubleshooting"><summary>Troubleshooting</summary>
+          <form class="panel settings-form" id="settings-form"><h2>Application overrides</h2><p>Change these only if an application cannot be found. Close apps started by this launcher before changing their paths.</p><label>HapticScape JAR<input name="hapticscapeJar" required spellcheck="false"></label><label>LumBridge JAR<input name="lumbridgeJar" required spellcheck="false"></label><label>Java executable<input name="javaPath" required spellcheck="false"></label><label>HapticScape profile<input name="profile" required maxlength="32" spellcheck="false"><small>Gameplay port: 41713</small></label><button class="button" type="submit">Save overrides</button></form>
+        </details>
+        <details class="credits"><summary>Image credits</summary><p>“RuneScape - Lumbridge” by PlasticFunnel, published on Mozilla Add-ons under Creative Commons Attribution-ShareAlike 3.0. Displayed with cropping, blur, and shading.</p><p class="credit-reference">Source: addons.mozilla.org/en-US/firefox/addon/runescape-lumbridge/<br>License: creativecommons.org/licenses/by-sa/3.0/</p><p>RuneScape imagery © Jagex Ltd. Unofficial launcher; not affiliated with Jagex.</p></details>
+      </section>
+    </div>
+    <footer>HapticScape · LumBridge</footer>
+  </main>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

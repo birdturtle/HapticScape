@@ -105,6 +105,13 @@ the required native acceptance evidence is available.
 
 ## Phase status
 
+As of 2026-10-06, the user accepts the current audio and secure-storage behavior
+for continued use and defers additional edge-case testing until issues emerge.
+The next workstream is the Windows/Linux unified launcher, including LumBridge,
+browser account authentication, and coordinated updates. See
+[unified-launcher-design.md](unified-launcher-design.md). Remaining acceptance
+items below retain their actual pending status.
+
 - Phase 1 implemented: explicit platform routing, fail-closed pending Linux
   backends, visible startup errors, and backend/lifecycle design documented in
   [linux-backend-design.md](linux-backend-design.md).

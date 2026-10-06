@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-launcher"
+description = "Local launcher commands; unavailable to remote authentication pages."
+commands.allow = ["launcher_status", "save_settings", "save_preferences", "launch_app", "begin_login", "cancel_login", "remove_account", "select_character", "load_accounts", "select_account", "check_updates"]

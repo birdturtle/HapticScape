@@ -1,0 +1,6 @@
+{
+  "identifier": "main-local",
+  "description": "Only the local launcher window receives app permissions. Jagex pages receive none.",
+  "windows": ["main"],
+  "permissions": ["core:default", "allow-launcher"]
+}
