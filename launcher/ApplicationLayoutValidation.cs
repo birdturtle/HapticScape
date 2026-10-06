@@ -20,6 +20,11 @@ internal static class ApplicationLayoutValidation
 
 	internal static bool IsValidStagedApplication(string directory)
 	{
+		bool suite = File.Exists(Path.Combine(directory, "app", "suite.json"));
+        if (suite && (!File.Exists(Path.Combine(directory, "launcher", "HapticScapeLauncher.exe"))
+            || !File.Exists(Path.Combine(directory, "launcher", "MicrosoftEdgeWebview2Setup.exe"))
+            || !File.Exists(Path.Combine(directory, "HapticScapeLegacy.exe"))
+            || !File.Exists(Path.Combine(directory, "LumBridge", "app", "lumbridge.jar")))) return false;
 		return File.Exists(Path.Combine(directory, "HapticScape.exe"))
 			&& File.Exists(Path.Combine(directory, "app", "hapticscape-desktop.jar"))
 			&& File.Exists(Path.Combine(directory, "app", "release.json"))

@@ -213,3 +213,51 @@ account/character persist. Existing single-account encrypted storage migrates on
 load, and wallet failures preserve existing data. Multi-account persistence,
 switching, removal, repeat login, and migration have unit coverage; live acceptance
 of the new multi-account flow remains to be checked by the user.
+
+## Existing Windows updater migration candidate
+
+Build with `./package-all.ps1 -Version 0.0.0-ci -UnifiedLauncher` on Windows
+with Node 22, stable Rust, and JDK 11 installed. CI builds this candidate;
+normal packaging stays opt-in until Windows acceptance is complete.
+
+The desktop ZIP retains the historical asset name, top-level `HapticScape`
+directory, `HapticScape.exe`, legacy JAR alias, `app/release.json`, and Java
+runtime expected by already-installed updaters. It additionally includes the
+Tauri launcher, the complete LumBridge bundle, a Microsoft-signed WebView2
+Evergreen bootstrapper, and `app/suite.json`. Publish the matching separate
+LumBridge ZIP and both checksums too: existing updaters require those assets.
+The packager verifies the browser bootstrapper's Authenticode signature before
+shipping it; the bootstrap and update helper install it only when needed.
+
+Existing shortcuts launch the suite through the compatibility bootstrap.
+Discord protocol links, explicit profiles/ports, minimized startup and update
+settings retain their historical behavior through `HapticScapeLegacy.exe`.
+Installed launcher defaults discover the bundled Java/JAR paths and leave the
+profile blank, using the existing normal HapticScape user-data directory.
+No account credentials, pairing history, profiles or wallet keys are deleted.
+Jagex accounts are added through sign-in in the new launcher; old credential
+files are not imported or automatically removed.
+
+An old updater runs the newly staged update helper. That helper keeps its backup
+until the new launcher's frontend renders and the installed component files
+are found. It uses a unique acknowledgement token in the update staging folder,
+independent of saved development paths or wallet availability. Early exit or a
+90-second startup timeout triggers an ordinary window-close request and rollback
+when filesystem locks permit it. The helper never kills Java clients; if rollback
+is blocked, the backup remains available rather than being deleted.
+
+The legacy repository address `ashy0019/HapticScape` currently resolves through
+GitHub's API to `birdturtle/HapticScape` (checked 2026-10-06). Keep the historical
+repository value in the legacy manifest because installed updater parsers require
+it; the suite marker and launcher's release check use the current repository.
+
+Release gate: on Windows, update from the actual currently released package,
+verify the existing shortcut opens the suite and prior app data remains available,
+exercise Jagex sign-in/Play, and repeat with a deliberately broken launcher to
+verify rollback. Test a machine without WebView2 and an installation with running
+clients/locked files. Native acknowledgement tests and candidate packaging run in
+Windows CI; Linux unit tests alone do not establish Windows upgrade acceptance.
+Use a version newer than the current stable release and publish both versioned
+ZIPs plus checksums only after that gate. No stable release is published by this
+implementation. Suite self-update activation and a Linux installer remain separate
+work: the launcher's Updates screen currently checks release metadata.

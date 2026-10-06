@@ -22,6 +22,7 @@ internal static class HapticScapeUpdater
 		string backupDirectory = null;
 		bool backupCreated = false;
 		bool newVersionInstalled = false;
+		Process newLauncher = null;
 
 		try
 		{
@@ -45,11 +46,18 @@ internal static class HapticScapeUpdater
 			newVersionInstalled = true;
 
 			string launcherPath = Path.Combine(installDirectory, "HapticScape.exe");
+			bool unified = File.Exists(Path.Combine(installDirectory, "app", "suite.json"));
+			if (unified) WebViewRuntime.EnsureInstalled(installDirectory);
+			string readyPath = Path.Combine(temporaryRoot, "launcher-ready");
+			string readyToken = Guid.NewGuid().ToString("N");
 			ProcessStartInfo startInfo = new ProcessStartInfo();
-			startInfo.FileName = launcherPath;
+			startInfo.FileName = unified
+				? Path.Combine(installDirectory, "launcher", "HapticScapeLauncher.exe") : launcherPath;
+			if (unified) startInfo.Arguments = "--update-ready-file \"" + readyPath + "\" --update-ready-token " + readyToken;
 			startInfo.WorkingDirectory = installDirectory;
 			startInfo.UseShellExecute = false;
-			Process.Start(startInfo);
+			newLauncher = Process.Start(startInfo);
+			if (unified) LauncherStartupValidation.WaitForReady(newLauncher, readyPath, readyToken, 90000);
 
 			TryDeleteDirectory(backupDirectory);
 			TryDeleteDirectory(temporaryRoot);
@@ -58,6 +66,16 @@ internal static class HapticScapeUpdater
 		}
 		catch (Exception exception)
 		{
+			try
+			{
+				if (newLauncher != null && !newLauncher.HasExited)
+				{
+					// Request ordinary launcher closure. Never kill Java or protected clients.
+					newLauncher.CloseMainWindow();
+					newLauncher.WaitForExit(10000);
+				}
+			}
+			catch (Exception) { /* Preserve the original failure and attempt rollback. */ }
 			TryRollback(
 				installDirectory,
 				stagedDirectory,

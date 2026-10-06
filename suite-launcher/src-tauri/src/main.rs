@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod accounts;
 mod auth;
+mod migration;
 mod processes;
 mod storage;
 
@@ -70,6 +71,12 @@ fn config(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 fn port_busy() -> bool {
     TcpListener::bind(("127.0.0.1", 41713)).is_err()
+}
+
+#[tauri::command]
+fn launcher_ready(window: WebviewWindow) -> Result<(), String> {
+    local(&window)?;
+    migration::acknowledge()
 }
 
 #[tauri::command]
@@ -200,7 +207,8 @@ async fn launch_app(
         if !processes::running(&mut children.hapticscape) {
             if port_busy() { return Err("Port 41713 is in use. Close the other HapticScape client before launching this profile.".into()); }
             let jar = processes::snapshot(&PathBuf::from(&settings.hapticscape_jar), &cache)?;
-            children.hapticscape = Some(processes::spawn(&settings, &jar, &["--profile", &settings.profile], &[])?);
+            let profile_args = if settings.profile.is_empty() { Vec::new() } else { vec!["--profile", settings.profile.as_str()] };
+            children.hapticscape = Some(processes::spawn(&settings, &jar, &profile_args, &[])?);
         }
         let deadline = Instant::now() + Duration::from_secs(15);
         while !port_busy() {
@@ -588,12 +596,20 @@ fn main() {
                         .set_icon_name(Some("com.hapticscape.launcher"));
                 }
             }
+            let installed = std::env::current_exe()
+                .ok()
+                .and_then(|p| Settings::installed_root(&p));
             let settings = config(app.handle())
                 .ok()
                 .and_then(|path| fs::read(path).ok())
                 .and_then(|data| serde_json::from_slice::<Settings>(&data).ok())
                 .filter(|s| s.validate().is_ok())
-                .unwrap_or_default();
+                .unwrap_or_else(|| {
+                    installed
+                        .as_ref()
+                        .map(|p| Settings::for_install(p))
+                        .unwrap_or_default()
+                });
             app.manage(AppState {
                 settings: Mutex::new(settings),
                 processes: Mutex::new(Processes::default()),
@@ -610,6 +626,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             launcher_status,
+            launcher_ready,
             save_settings,
             save_preferences,
             launch_app,

@@ -2,6 +2,7 @@ fn main() {
     let attributes = tauri_build::Attributes::new()
         .app_manifest(tauri_build::AppManifest::new().commands(&[
             "launcher_status",
+            "launcher_ready",
             "save_settings",
             "save_preferences",
             "launch_app",

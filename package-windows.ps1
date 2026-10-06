@@ -96,6 +96,10 @@ try
 	}
 
 	$runtimeModules = @(
+		'java.se',
+		'jdk.jsobject',
+		'jdk.management',
+		'jdk.net',
 		'java.base',
 		'java.desktop',
 		'java.logging',
@@ -158,6 +162,7 @@ try
 		$deepLinkCoreSource,
 		$launchOptionsCoreSource,
 		$applicationLayoutValidationSource,
+		(Join-Path $projectRoot 'launcher\LauncherStartupValidation.cs'),
 		$nativeTestSource
 	)
 
@@ -184,6 +189,8 @@ try
 		'/reference:System.Windows.Forms.dll',
 		"/out:$updaterPath",
 		$updaterSource,
+		(Join-Path $projectRoot 'launcher\LauncherStartupValidation.cs'),
+		(Join-Path $projectRoot 'launcher\WebViewRuntime.cs'),
 		$applicationLayoutValidationSource
 	)
 

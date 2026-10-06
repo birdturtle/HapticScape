@@ -137,12 +137,13 @@ if (!invoke) {
   $('play').disabled = true; $('open-haptic').disabled = true;
 }
 async function initialize() {
+  await refresh();
+  if (!status) return;
+  if (invoke) { try { await invoke('launcher_ready'); } catch (error) { toast(error, true); } }
   if (invoke) {
     try { await invoke('load_accounts'); } catch (error) { toast(error, true); }
   }
   await refresh();
-  if (!status) return;
-  const preferences = status.settings.preferences;
-  if (preferences.checkUpdatesOnStartup) await checkUpdates();
+  if (status.settings.preferences.checkUpdatesOnStartup) await checkUpdates();
 }
 initialize(); setInterval(refresh, 2000);

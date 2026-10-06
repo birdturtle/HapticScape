@@ -42,7 +42,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 test('accounts load and releases check once; polling preserves unsaved edits', async () => {
   const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: true });
   await settle();
-  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['load_accounts', 'check_updates']);
+  assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['launcher_ready', 'load_accounts', 'check_updates']);
   app.element('preferences-form:minimizeOnPlay').checked = true;
   await app.poll();
   assert.equal(app.element('preferences-form:minimizeOnPlay').checked, true);
@@ -57,5 +57,5 @@ test('accounts load and releases check once; polling preserves unsaved edits', a
 test('accounts always load, while release checks remain opt-in', async () => {
   const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: false });
   await settle();
-  assert.deepEqual(app.calls.map((call) => call.command), ['load_accounts', 'launcher_status']);
+  assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'launcher_ready', 'load_accounts', 'launcher_status']);
 });

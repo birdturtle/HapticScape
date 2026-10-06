@@ -3,7 +3,9 @@ param(
     [ValidatePattern("^[0-9]+(?:\.[0-9]+){0,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$")]
     [string]$Version,
 
-    [string]$RuneLiteVersion
+    [string]$RuneLiteVersion,
+
+    [switch]$UnifiedLauncher
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +93,8 @@ try
     {
         & $bridgePackager -Version $Version -RuneLiteVersion $RuneLiteVersion
     }
+
+    if ($UnifiedLauncher) { & (Join-Path $projectRoot 'package-unified-launcher.ps1') -Version $Version -Architecture $architecture }
 
     if (-not (Test-Path $desktopZip -PathType Leaf))
     {

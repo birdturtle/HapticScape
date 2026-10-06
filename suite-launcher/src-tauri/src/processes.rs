@@ -56,14 +56,45 @@ impl Default for Settings {
 }
 
 impl Settings {
+    pub fn for_install(root: &Path) -> Self {
+        Self {
+            hapticscape_jar: root
+                .join("app/hapticscape-desktop.jar")
+                .to_string_lossy()
+                .into(),
+            lumbridge_jar: root
+                .join("LumBridge/app/lumbridge.jar")
+                .to_string_lossy()
+                .into(),
+            java_path: root
+                .join(if cfg!(windows) {
+                    "runtime/bin/javaw.exe"
+                } else {
+                    "runtime/bin/java"
+                })
+                .to_string_lossy()
+                .into(),
+            // No named profile means the existing application's normal data directory.
+            profile: String::new(),
+            preferences: Preferences::default(),
+        }
+    }
+    pub fn installed_root(executable: &Path) -> Option<PathBuf> {
+        let parent = executable.parent()?;
+        [Some(parent), parent.parent()]
+            .into_iter()
+            .flatten()
+            .find(|p| p.join("app/release.json").is_file())
+            .map(Path::to_path_buf)
+    }
     pub fn validate(&self) -> Result<(), String> {
-        if self.profile.is_empty()
-            || self.profile.len() > 32
-            || !self.profile.as_bytes()[0].is_ascii_alphanumeric()
-            || !self
-                .profile
-                .bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+        if !self.profile.is_empty()
+            && (self.profile.len() > 32
+                || !self.profile.as_bytes()[0].is_ascii_alphanumeric()
+                || !self
+                    .profile
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c)))
         {
             return Err(
                 "Profile must contain 1–32 letters, numbers, dots, underscores, or hyphens.".into(),
@@ -157,7 +188,7 @@ mod tests {
     }
     #[test]
     fn profile_validation_rejects_paths_and_option_injection() {
-        for profile in ["", "../wallet", "--profile", "a b", "x/y"] {
+        for profile in ["../wallet", "--profile", "a b", "x/y"] {
             let mut settings = Settings::default();
             settings.profile = profile.into();
             assert!(settings.validate().is_err());
@@ -165,6 +196,30 @@ mod tests {
         let mut settings = Settings::default();
         settings.profile = "linux-test.1".into();
         assert!(settings.validate().is_ok());
+        settings.profile.clear();
+        assert!(settings.validate().is_ok());
+    }
+    #[test]
+    fn installed_layout_uses_bundled_components_and_the_existing_default_profile() {
+        let root =
+            std::env::temp_dir().join(format!("hapticscape-install-{}", rand::random::<u64>()));
+        fs::create_dir_all(root.join("app")).unwrap();
+        fs::write(root.join("app/release.json"), b"{}").unwrap();
+        let found =
+            Settings::installed_root(&root.join("launcher/HapticScapeLauncher.exe")).unwrap();
+        assert_eq!(found, root);
+        let settings = Settings::for_install(&found);
+        assert!(settings.profile.is_empty());
+        assert_eq!(
+            PathBuf::from(settings.hapticscape_jar),
+            root.join("app/hapticscape-desktop.jar")
+        );
+        assert_eq!(
+            PathBuf::from(settings.lumbridge_jar),
+            root.join("LumBridge/app/lumbridge.jar")
+        );
+        assert!(Settings::installed_root(&root.join("unrelated/deep/launcher.exe")).is_none());
+        fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn snapshot_is_immutable_when_source_changes() {
