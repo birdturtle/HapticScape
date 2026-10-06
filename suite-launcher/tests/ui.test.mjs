@@ -14,3 +14,11 @@ test('launcher content policy prohibits remote scripts and frames', () => {
   assert.match(config.app.security.csp, /frame-src 'none'/);
   assert.doesNotMatch(config.app.security.csp, /unsafe-eval|unsafe-inline|https:\/\//);
 });
+
+
+test('first-run installation is declared and allowed only for the local launcher', () => {
+  const build = readFileSync(new URL('../src-tauri/build.rs', import.meta.url), 'utf8');
+  const permissions = readFileSync(new URL('../src-tauri/permissions/launcher.toml', import.meta.url), 'utf8');
+  assert.match(build, /"install_components"/);
+  assert.match(permissions, /"install_components"/);
+});

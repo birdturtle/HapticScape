@@ -3,6 +3,7 @@ fn main() {
         .app_manifest(tauri_build::AppManifest::new().commands(&[
             "launcher_status",
             "launcher_ready",
+            "install_components",
             "save_settings",
             "save_preferences",
             "launch_app",

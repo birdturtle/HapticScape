@@ -207,6 +207,10 @@ fn save_settings(
     let mut settings = settings;
     // Troubleshooting overrides do not change user preferences.
     settings.preferences = current.preferences.clone();
+    settings.managed_components = current.managed_components
+        && settings.hapticscape_jar == current.hapticscape_jar
+        && settings.lumbridge_jar == current.lumbridge_jar
+        && settings.java_path == current.java_path;
     persist_settings(&app, &settings)?;
     *current = settings;
     Ok(())

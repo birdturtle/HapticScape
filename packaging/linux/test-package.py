@@ -60,8 +60,8 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
         try:
             deadline = time.monotonic() + 45
             while time.monotonic() < deadline and process.poll() is None:
-                if marker.exists() and marker.read_text() == token:
-                    print('Launcher-only Linux installer, separate Java payload and frontend startup passed.')
+                if marker.exists() and marker.read_text() == token and (home / '.local/share/com.hapticscape.launcher/components').is_dir():
+                    print('Launcher-only Linux installer, separate Java payload, frontend startup and first-run download permission passed.')
                     break
                 time.sleep(0.2)
             else:
