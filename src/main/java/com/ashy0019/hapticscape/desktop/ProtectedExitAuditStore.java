@@ -1,5 +1,9 @@
 package com.ashy0019.hapticscape.desktop;
 
+import com.google.gson.Gson;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -22,14 +26,19 @@ public final class ProtectedExitAuditStore
 	private static final String PROTECTED_CONTROLLER = "protectedControllerId";
 	private static final String EVENT_ID = "unauthorizedEndEventId";
 	private static final String EVENT_CONTROLLER = "unauthorizedEndControllerId";
+	private static final String PROTECTED_LOCK = "protectedLockId";
+	private static final String EVENT_LOCK = "unauthorizedEndLockId";
 	private static final String EVENT_TIME = "unauthorizedEndOccurredAt";
 
 	private final Path path;
+	private final List<UnauthorizedEndRecord> backlog = new ArrayList<>();
 	private boolean running;
 	private boolean pending;
 	private boolean protectedExit;
 	private String protectedControllerId;
 	private String eventId;
+	private String protectedLockId;
+	private String eventLockId;
 	private String eventControllerId;
 	private long eventTime;
 
@@ -45,6 +54,11 @@ public final class ProtectedExitAuditStore
 	}
 
 	public synchronized void beginRun(boolean protectionActive, String controllerId)
+	{
+		beginRun(protectionActive, controllerId, null);
+	}
+
+	public synchronized void beginRun(boolean protectionActive, String controllerId, String lockId)
 	{
 		if (running && protectedExit)
 		{
@@ -63,6 +77,7 @@ public final class ProtectedExitAuditStore
 		running = true;
 		protectedExit = protectionActive;
 		protectedControllerId = protectionActive ? validUuidOrNull(controllerId) : null;
+		protectedLockId = protectionActive ? validUuidOrNull(lockId) : null;
 		persist();
 	}
 
@@ -73,8 +88,14 @@ public final class ProtectedExitAuditStore
 
 	public synchronized void setProtectionActive(boolean protectionActive, String controllerId)
 	{
+		setProtectionActive(protectionActive, controllerId, null);
+	}
+
+	public synchronized void setProtectionActive(boolean protectionActive, String controllerId, String lockId)
+	{
 		protectedExit = protectionActive;
 		protectedControllerId = protectionActive ? validUuidOrNull(controllerId) : null;
+		protectedLockId = protectionActive ? validUuidOrNull(lockId) : null;
 		persist();
 	}
 
@@ -83,6 +104,7 @@ public final class ProtectedExitAuditStore
 		running = false;
 		protectedExit = false;
 		protectedControllerId = null;
+		protectedLockId = null;
 		persist();
 	}
 
@@ -100,13 +122,14 @@ public final class ProtectedExitAuditStore
 			: validUuidOrNull(currentControllerId);
 		protectedControllerId = null;
 		createPendingEvent(owner);
+		protectedLockId = null;
 		persist();
-		return new UnauthorizedEndRecord(eventId, eventControllerId, eventTime);
+		return new UnauthorizedEndRecord(eventId, eventControllerId, eventTime, eventLockId);
 	}
 
 	public synchronized boolean hasPendingUnauthorizedEnd()
 	{
-		return pending;
+		return pending || !backlog.isEmpty();
 	}
 
 	public synchronized Optional<UnauthorizedEndRecord> getPendingUnauthorizedEnd()
@@ -115,7 +138,14 @@ public final class ProtectedExitAuditStore
 		{
 			return Optional.empty();
 		}
-		return Optional.of(new UnauthorizedEndRecord(eventId, eventControllerId, eventTime));
+		return Optional.of(new UnauthorizedEndRecord(eventId, eventControllerId, eventTime, eventLockId));
+	}
+
+	public synchronized List<UnauthorizedEndRecord> getPendingUnauthorizedEnds()
+	{
+		List<UnauthorizedEndRecord> records = new ArrayList<>(backlog);
+		getPendingUnauthorizedEnd().ifPresent(records::add);
+		return Collections.unmodifiableList(records);
 	}
 
 	public synchronized void clearPendingUnauthorizedEnd()
@@ -126,18 +156,22 @@ public final class ProtectedExitAuditStore
 
 	public synchronized boolean clearPendingUnauthorizedEnd(String acknowledgedEventId)
 	{
-		if (!pending || eventId == null || !eventId.equals(acknowledgedEventId))
+		if (backlog.removeIf(record -> record.getEventId().equals(acknowledgedEventId)))
 		{
-			return false;
+			persist();
+			return true;
 		}
-		clearPending();
+		if (!pending || eventId == null || !eventId.equals(acknowledgedEventId)) return false;
+		clearCurrentPending();
 		persist();
 		return true;
 	}
 
 	private void createPendingEvent(String controllerId)
 	{
+		getPendingUnauthorizedEnd().ifPresent(backlog::add);
 		pending = true;
+		eventLockId = protectedLockId;
 		eventId = UUID.randomUUID().toString();
 		eventControllerId = validUuidOrNull(controllerId);
 		eventTime = System.currentTimeMillis();
@@ -145,10 +179,17 @@ public final class ProtectedExitAuditStore
 
 	private void clearPending()
 	{
+		backlog.clear();
+		clearCurrentPending();
+	}
+
+	private void clearCurrentPending()
+	{
 		pending = false;
 		eventId = null;
 		eventControllerId = null;
 		eventTime = 0;
+		eventLockId = null;
 	}
 
 	private static String validUuidOrNull(String value)
@@ -179,11 +220,24 @@ public final class ProtectedExitAuditStore
 		try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8))
 		{
 			properties.load(reader);
+			UnauthorizedEndRecord[] queued = new Gson().fromJson(
+				properties.getProperty("unauthorizedEndBacklog", "[]"), UnauthorizedEndRecord[].class);
+			if (queued != null)
+			{
+				for (UnauthorizedEndRecord record : queued)
+				{
+					if (record != null && validUuidOrNull(record.eventId) != null
+						&& validUuidOrNull(record.controllerId) != null && record.occurredAtMillis > 0
+						&& (record.lockId == null || validUuidOrNull(record.lockId) != null)) backlog.add(record);
+				}
+			}
 			running = Boolean.parseBoolean(properties.getProperty(RUNNING));
 			pending = Boolean.parseBoolean(properties.getProperty(PENDING));
 			protectedExit = Boolean.parseBoolean(properties.getProperty(PROTECTED));
 			protectedControllerId = validUuidOrNull(properties.getProperty(PROTECTED_CONTROLLER));
 			eventId = validUuidOrNull(properties.getProperty(EVENT_ID));
+			protectedLockId = validUuidOrNull(properties.getProperty(PROTECTED_LOCK));
+			eventLockId = validUuidOrNull(properties.getProperty(EVENT_LOCK));
 			eventControllerId = validUuidOrNull(properties.getProperty(EVENT_CONTROLLER));
 			try
 			{
@@ -214,11 +268,14 @@ public final class ProtectedExitAuditStore
 			Files.createDirectories(parent);
 			temporary = Files.createTempFile(parent, "protected-exit-", ".tmp");
 			Properties properties = new Properties();
+			properties.setProperty("unauthorizedEndBacklog", new Gson().toJson(backlog));
 			properties.setProperty(RUNNING, Boolean.toString(running));
 			properties.setProperty(PENDING, Boolean.toString(pending));
 			properties.setProperty(PROTECTED, Boolean.toString(protectedExit));
 			put(properties, PROTECTED_CONTROLLER, protectedControllerId);
 			put(properties, EVENT_ID, eventId);
+			put(properties, PROTECTED_LOCK, protectedLockId);
+			put(properties, EVENT_LOCK, eventLockId);
 			put(properties, EVENT_CONTROLLER, eventControllerId);
 			properties.setProperty(EVENT_TIME, Long.toString(eventTime));
 			try (BufferedWriter writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8))
@@ -269,14 +326,17 @@ public final class ProtectedExitAuditStore
 		private final String eventId;
 		private final String controllerId;
 		private final long occurredAtMillis;
+		private final String lockId;
 
-		private UnauthorizedEndRecord(String eventId, String controllerId, long occurredAtMillis)
+		private UnauthorizedEndRecord(String eventId, String controllerId, long occurredAtMillis, String lockId)
 		{
 			this.eventId = eventId;
 			this.controllerId = controllerId;
 			this.occurredAtMillis = occurredAtMillis;
+			this.lockId = lockId;
 		}
 
+		public String getLockId() { return lockId; }
 		public String getEventId() { return eventId; }
 		public String getControllerId() { return controllerId; }
 		public long getOccurredAtMillis() { return occurredAtMillis; }

@@ -201,6 +201,12 @@ public final class SavedUnlockKeyStore
 			{
 				requireNotForgotten(lockId);
 				List<SavedUnlockKey> updated = new ArrayList<>(entries);
+				for (SavedUnlockKey existing : entries)
+				{
+					if (!lockId.equals(existing.getLockId())) continue;
+					for (SavedUnlockKey.ExitEvent event : existing.getUnauthorizedEnds())
+						entry = entry.withUnauthorizedEnd(event.getEventId(), event.getOccurredAt().toEpochMilli());
+				}
 				updated.removeIf(existing ->
 					requiredSubjectId.equals(existing.getSubjectId())
 						|| lockId.equals(existing.getLockId())
@@ -219,6 +225,34 @@ public final class SavedUnlockKeyStore
 				Arrays.fill(protectedBytes, (byte) 0);
 			}
 		}
+	}
+
+	/** Records authenticated exit notices without opening or changing the protected key. */
+	public synchronized boolean recordUnauthorizedEnd(String subjectId, long occurredAtMillis)
+	{
+		return recordUnauthorizedEnd(subjectId, null, "legacy-" + occurredAtMillis, occurredAtMillis);
+	}
+
+	public synchronized boolean recordUnauthorizedEnd(
+		String subjectId, String lockId, String eventId, long occurredAtMillis)
+	{
+		if (subjectId == null || path == null || loadFailure != null) return false;
+		if (occurredAtMillis <= 0 || eventId == null || eventId.isEmpty() || eventId.length() > 80)
+			throw new IllegalArgumentException("Invalid exit event");
+		for (int index = 0; index < entries.size(); index++)
+		{
+			SavedUnlockKey entry = entries.get(index);
+			if (!subjectId.equals(entry.getSubjectId())
+				|| (lockId != null && !lockId.equals(entry.getLockId()))) continue;
+			if (entry.getUnauthorizedEnds().stream().anyMatch(event -> eventId.equals(event.getEventId())))
+				return true;
+			List<SavedUnlockKey> updated = new ArrayList<>(entries);
+			updated.set(index, entry.withUnauthorizedEnd(eventId, occurredAtMillis));
+			persist(updated);
+			entries = Collections.unmodifiableList(updated);
+			return true;
+		}
+		return false;
 	}
 
 	public synchronized SavedUnlockKey updateDetails(

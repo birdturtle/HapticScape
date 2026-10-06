@@ -42,6 +42,7 @@ public final class RemoteSessionManager implements AutoCloseable
 	private final Gson gson;
 	private final EffectiveSettingsService effectiveSettings;
 	private final SettingsLockService settingsLockService;
+	private final SavedUnlockKeyStore savedUnlockKeyStore;
 	private final RemoteActionCoordinator actionCoordinator;
 	private final RemoteActivityCoordinator activityCoordinator;
 	private final RemoteLockCoordinator lockCoordinator;
@@ -236,6 +237,7 @@ public final class RemoteSessionManager implements AutoCloseable
 			savedUnlockKeyStore,
 			"savedUnlockKeyStore"
 		);
+		this.savedUnlockKeyStore = requiredSavedUnlockKeyStore;
 		RemotePermissionsStore requiredPermissionsStore = Objects.requireNonNull(
 			permissionsStore,
 			"permissionsStore"
@@ -429,6 +431,12 @@ public final class RemoteSessionManager implements AutoCloseable
 		long occurredAtMillis,
 		String reason)
 	{
+		return reportUnauthorizedEnd(eventId, controllerId, occurredAtMillis, reason, null);
+	}
+
+	public synchronized boolean reportUnauthorizedEnd(
+		String eventId, String controllerId, long occurredAtMillis, String reason, String lockId)
+	{
 		if (role != RemoteRole.PARTICIPANT
 			|| snapshot.getState() == RemoteSessionState.LOCAL
 			|| snapshot.getState() == RemoteSessionState.DISCONNECTED
@@ -441,7 +449,8 @@ public final class RemoteSessionManager implements AutoCloseable
 			eventId,
 			controllerId,
 			occurredAtMillis,
-			reason
+			reason,
+			lockId
 		);
 		return send(RemoteMessageType.UNAUTHORIZED_END, 0, gson.toJson(notice));
 	}
@@ -1416,6 +1425,7 @@ public final class RemoteSessionManager implements AutoCloseable
 			catch (RuntimeException invalidNotice)
 			{
 				// Preserve visibility for older clients which sent a plain reason.
+				savedUnlockKeyStore.recordUnauthorizedEnd(peerClientId, clock.millis());
 				publish(snapshot.getState(), "Unauthorized end flagged by participant client");
 				for (RemoteSessionListener listener : listeners)
 				{
@@ -1427,6 +1437,9 @@ public final class RemoteSessionManager implements AutoCloseable
 			{
 				return;
 			}
+			// Persist before acknowledging so a failed write can be retried on reconnect.
+			savedUnlockKeyStore.recordUnauthorizedEnd(peerClientId, notice.getLockId(),
+				notice.getEventId(), notice.getOccurredAtMillis());
 			send(RemoteMessageType.UNAUTHORIZED_END_ACK, 0, notice.getEventId());
 			if (!rememberUnauthorizedEnd(notice.getEventId()))
 			{

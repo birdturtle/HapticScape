@@ -419,7 +419,7 @@ A protected lock can include:
 - Start minimized to the tray.
 - Password-protected application exit.
 
-When protected exit is active, closing from the tray or other exit path requires the lock password. After 10 seconds, **Exit without password** becomes available. Using it stops output, records an unauthorized end, and reports the event to the controller when possible.
+When protected exit is active, closing from the tray or other exit path requires the lock password. After 10 seconds, **Exit without password** becomes available. Using it stops output, records an unauthorized end, and reports the event to the controller when possible. On the controller, a matching saved subject profile shows an **Exits without unlocking** count and timestamped history for that lock in Saved unlock keys → Manage. This history persists across restarts and leaves the profile’s note unchanged. A new lock starts a new history; repeated delivery of the same event does not increase the count.
 
 #### Saved Unlock Keys
 

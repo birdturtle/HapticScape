@@ -366,11 +366,15 @@ public class RemoteSessionManagerTest
 		throws Exception
 	{
 		TestRelay relay = new TestRelay();
+		SavedUnlockKeyStore vault = new SavedUnlockKeyStore(new Gson(),
+			temporaryFolder.getRoot().toPath().resolve("audit-vault.json"),
+			new TestUnlockKeyProtector(), Clock.systemUTC());
 		try (RemoteSessionManager controller = new RemoteSessionManager(
 			new Gson(),
 			new MemoryStore(new MutableConfig(20)),
 			new EffectiveSettingsService(new MutableConfig(20)),
 			lockService("audit-controller.json"),
+			vault,
 			relay);
 			RemoteSessionManager participant = new RemoteSessionManager(
 				new Gson(),
@@ -407,18 +411,32 @@ public class RemoteSessionManagerTest
 			await(() -> participant.getPeerClientId().isPresent());
 			String controllerId = participant.getPeerClientId().orElseThrow(AssertionError::new);
 			String eventId = java.util.UUID.randomUUID().toString();
+			String subjectId = controller.getPeerClientId().orElseThrow(AssertionError::new);
+			String lockId = java.util.UUID.randomUUID().toString();
+			vault.saveAcceptedProfileKey(lockId, subjectId,
+				"Subject", "ABCD-EFGH-JKLM-NPQR-STUV".toCharArray());
 
 			assertFalse(participant.reportUnauthorizedEnd(
 				eventId, java.util.UUID.randomUUID().toString(), 1234L, "wrong target"));
 			assertTrue(participant.reportUnauthorizedEnd(
-				eventId, controllerId, 1234L, "Unauthorized end"));
+				eventId, controllerId, 1234L, "Unauthorized end", lockId));
 			assertTrue(participant.reportUnauthorizedEnd(
-				eventId, controllerId, 1234L, "Unauthorized end"));
+				eventId, controllerId, 1234L, "Unauthorized end", lockId));
 
 			await(() -> received.size() == 1 && acknowledged.size() == 2);
 			assertEquals(Collections.singletonList("Unauthorized end"), received);
 			assertEquals(2, acknowledged.size());
 			assertEquals(eventId, acknowledged.get(0));
+			assertEquals(java.time.Instant.ofEpochMilli(1234L),
+				vault.list().get(0).getLastUnauthorizedEndAt());
+			String secondEvent = java.util.UUID.randomUUID().toString();
+			assertTrue(participant.reportUnauthorizedEnd(
+				secondEvent, controllerId, 2345L, "Unauthorized end", lockId));
+			await(() -> vault.list().get(0).getUnauthorizedEnds().size() == 2);
+			assertTrue(participant.reportUnauthorizedEnd(
+				secondEvent, controllerId, 2345L, "Unauthorized end", lockId));
+			await(() -> acknowledged.size() == 4);
+			assertEquals(2, vault.list().get(0).getUnauthorizedEnds().size());
 		}
 	}
 
