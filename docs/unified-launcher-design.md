@@ -261,3 +261,32 @@ Use a version newer than the current stable release and publish both versioned
 ZIPs plus checksums only after that gate. No stable release is published by this
 implementation. Suite self-update activation and a Linux installer remain separate
 work: the launcher's Updates screen currently checks release metadata.
+
+## Automated migration transactions and Linux distribution
+
+`launcher-tests/test-migration.ps1` compiles controlled native launcher fixtures
+and invokes the production updater transaction (`HapticScapeUpdater.Run`). It
+covers replacement and startup-failure rollback from both the legacy JAR layout
+and the standalone bundled-runtime layout, verifies the existing executable target,
+staging/backup cleanup, runtime prerequisite invocation and unchanged external user
+data. Runtime installation and error presentation are injected at the transaction
+boundary; directory replacement, validation, process launch, acknowledgement and
+rollback are the production implementation. These tests do not establish browser
+rendering, real Windows credential persistence or Jagex/Java launch acceptance.
+
+`bash package-linux.sh 0.0.0-ci` builds and checks both Java apps and the Tauri
+launcher, bundles a jlink Java runtime and licenses, then emits a checksummed
+self-extracting `.run`, a portable `.tar.gz`, and a `.deb` when dpkg-deb is available.
+Release packaging requires a clean matching version tag. Linux CI builds on Ubuntu
+22.04, avoiding a dependency on the newer glibc used by the development machine.
+
+The `.run` and archive installer need no root privileges and install versioned
+payloads under XDG_DATA_HOME/hapticscape/releases. An atomic current symlink switches
+the application-menu entry to the new release without overwriting a running binary.
+Existing app data and launcher account settings stay outside the payload. Installer
+checks cover fresh installation, upgrade, paths containing spaces, preservation of
+the old payload/data and rejection of missing components. Previous versions are
+retained for recovery; automatic launcher-driven download/update activation is still
+separate work. Debian installation uses /opt/hapticscape with dependency metadata
+and a desktop entry managed by the package manager. GTK/WebKit and a working Secret
+Service wallet remain system prerequisites; PipeWire tools support music capture.

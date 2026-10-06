@@ -16,6 +16,17 @@ internal static class HapticScapeUpdater
 		Application.EnableVisualStyles();
 		Application.SetCompatibleTextRenderingDefault(false);
 
+        int result = Run(args, WebViewRuntime.EnsureInstalled, delegate(string message) {
+            MessageBox.Show(message, "HapticScape update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        });
+        ScheduleSelfDeletion();
+        return result;
+    }
+
+    // Production transaction, exercised with controlled launcher fixtures in CI.
+    internal static int Run(string[] args, Action<string> ensureRuntime, Action<string> reportError)
+    {
+
 		string installDirectory = null;
 		string stagedDirectory = null;
 		string temporaryRoot = null;
@@ -47,7 +58,7 @@ internal static class HapticScapeUpdater
 
 			string launcherPath = Path.Combine(installDirectory, "HapticScape.exe");
 			bool unified = File.Exists(Path.Combine(installDirectory, "app", "suite.json"));
-			if (unified) WebViewRuntime.EnsureInstalled(installDirectory);
+			if (unified) ensureRuntime(installDirectory);
 			string readyPath = Path.Combine(temporaryRoot, "launcher-ready");
 			string readyToken = Guid.NewGuid().ToString("N");
 			ProcessStartInfo startInfo = new ProcessStartInfo();
@@ -61,7 +72,6 @@ internal static class HapticScapeUpdater
 
 			TryDeleteDirectory(backupDirectory);
 			TryDeleteDirectory(temporaryRoot);
-			ScheduleSelfDeletion();
 			return 0;
 		}
 		catch (Exception exception)
@@ -83,13 +93,7 @@ internal static class HapticScapeUpdater
 				backupCreated,
 				newVersionInstalled);
 			TryLaunchExisting(installDirectory);
-			MessageBox.Show(
-				"HapticScape could not finish installing the update. The previous version was restored when possible.\n\n"
-					+ exception.Message,
-				"HapticScape update failed",
-				MessageBoxButtons.OK,
-				MessageBoxIcon.Error);
-			ScheduleSelfDeletion();
+            reportError("HapticScape could not finish installing the update. The previous version was restored when possible.\n\n" + exception.Message);
 			return 1;
 		}
 	}
