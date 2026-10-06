@@ -8,6 +8,9 @@ import tarfile
 import time
 import uuid
 
+if not os.environ.get('HAPTICSCAPE_TEST_BUS'):
+    raise SystemExit(subprocess.call(['dbus-run-session', '--', sys.executable, __file__, *sys.argv[1:]], env=dict(os.environ, HAPTICSCAPE_TEST_BUS='1')))
+
 installer = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporary:
     root = Path(temporary)
@@ -35,7 +38,6 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
         helper.chmod(0o755)
     env = dict(os.environ, HOME=str(home), XDG_DATA_HOME=str(home / '.local/share'), XDG_CONFIG_HOME=str(home / '.config'), XDG_CACHE_HOME=str(home / '.cache'), PATH=f'{tools}:{os.environ["PATH"]}', GDK_BACKEND='x11')
     env.pop('WAYLAND_DISPLAY', None)
-    env.pop('DBUS_SESSION_BUS_ADDRESS', None)
     subprocess.run(['bash', str(installer)], env=env, check=True)
     installed = home / '.local/share/hapticscape/current'
     assert (installed / 'app/bootstrap.json').is_file()

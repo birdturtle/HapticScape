@@ -10,7 +10,7 @@ import tarfile
 import time
 
 if not os.environ.get('HAPTICSCAPE_TEST_DISPLAY'):
-    raise SystemExit(subprocess.call(['xvfb-run', '-a', sys.executable, __file__, *sys.argv[1:]], env=dict(os.environ, HAPTICSCAPE_TEST_DISPLAY='1')))
+    raise SystemExit(subprocess.call(['dbus-run-session', '--', 'xvfb-run', '-a', sys.executable, __file__, *sys.argv[1:]], env=dict(os.environ, HAPTICSCAPE_TEST_DISPLAY='1')))
 
 installer = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='hapticscape-update-test-') as temporary:
@@ -24,7 +24,6 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-update-test-') as temporary
         tool.write_text('#!/bin/sh\nexit 0\n')
         tool.chmod(0o755)
     env = dict(os.environ, HOME=str(home), XDG_DATA_HOME=str(home / '.local/share'), XDG_CONFIG_HOME=str(home / '.config'), XDG_CACHE_HOME=str(home / '.cache'), PATH=f'{tools}:{os.environ["PATH"]}', GDK_BACKEND='x11')
-    env.pop('DBUS_SESSION_BUS_ADDRESS', None)
     env.pop('WAYLAND_DISPLAY', None)
     subprocess.run(['bash', str(installer)], env=env, check=True)
     install = home / '.local/share/hapticscape'
