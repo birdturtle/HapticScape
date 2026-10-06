@@ -261,3 +261,22 @@ tasks.register('collectRuntimeLicenses') {
 		)
 	}
 }
+
+// Explicit Linux native check: exercises bindings without contacting the user's wallet.
+tasks.register('verifyLinuxKeyringBindings', JavaExec) {
+	dependsOn tasks.named('testClasses')
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.ashy0019.hapticscape.integration.desktop.LibsecretFailureSmoke'
+	group = LifecycleBasePlugin.VERIFICATION_GROUP
+	description = 'Checks Linux libsecret bindings against an isolated unreachable session bus.'
+	onlyIf { System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('linux') }
+	doFirst {
+		def isolatedDirectory = java.nio.file.Files.createTempDirectory('hapticscape-keyring-smoke-')
+		environment 'DBUS_SESSION_BUS_ADDRESS', "unix:path=${isolatedDirectory.resolve('no-bus')}"
+		// The empty directory owns no socket or secret; remove it after execution.
+		ext.isolatedKeyringDirectory = isolatedDirectory
+	}
+	doLast {
+		java.nio.file.Files.deleteIfExists(ext.isolatedKeyringDirectory)
+	}
+}

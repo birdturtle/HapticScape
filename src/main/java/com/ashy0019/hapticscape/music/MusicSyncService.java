@@ -260,7 +260,9 @@ public final class MusicSyncService implements AutoCloseable
 					? (e.getMessage() == null
 						? "Unable to start application audio capture"
 						: e.getMessage())
-					: "Unable to start system audio capture",
+					: (e.getMessage() == null
+						? "Unable to start system audio capture"
+						: e.getMessage()),
 				e
 			);
 		}

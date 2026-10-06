@@ -25,8 +25,9 @@ public final class DiscordCredentialStore
 	private final Gson gson;
 	private final Path path;
 	private final UnlockKeyProtector protector;
-	private DiscordDeviceCredential credential;
-	private String loadFailure;
+	private volatile DiscordDeviceCredential credential;
+	private volatile CredentialFile pendingCredential;
+	private volatile String loadFailure;
 
 	public DiscordCredentialStore(
 		Gson gson,
@@ -48,18 +49,15 @@ public final class DiscordCredentialStore
 		this.gson = Objects.requireNonNull(gson, "gson");
 		this.path = Objects.requireNonNull(path, "path");
 		this.protector = Objects.requireNonNull(protector, "protector");
-		if (protector.isAvailable())
-		{
-			load();
-		}
+		load();
 	}
 
-	public synchronized boolean isAvailable()
+	public boolean isAvailable()
 	{
 		return protector.isAvailable() && loadFailure == null;
 	}
 
-	public synchronized String getUnavailableMessage()
+	public String getUnavailableMessage()
 	{
 		if (!protector.isAvailable())
 		{
@@ -70,12 +68,16 @@ public final class DiscordCredentialStore
 
 	synchronized Optional<DiscordDeviceCredential> get()
 	{
+		ensureAvailable();
+		openPendingCredential();
 		return Optional.ofNullable(credential);
 	}
 
 	synchronized void save(DiscordDeviceCredential next)
 	{
 		ensureAvailable();
+		// Never replace data whose wallet key has not been successfully retrieved.
+		openPendingCredential();
 		DiscordDeviceCredential required = Objects.requireNonNull(next, "credential");
 		required.validate();
 		byte[] plaintext = required.getSecret().getBytes(StandardCharsets.US_ASCII);
@@ -111,6 +113,8 @@ public final class DiscordCredentialStore
 			Files.deleteIfExists(path);
 			Files.deleteIfExists(temporary);
 			credential = null;
+			pendingCredential = null;
+			loadFailure = null;
 		}
 		catch (IOException exception)
 		{
@@ -139,32 +143,58 @@ public final class DiscordCredentialStore
 				throw new IllegalArgumentException("Unsupported Discord credential format");
 			}
 			byte[] protectedBytes = Base64.getDecoder().decode(file.protectedSecret);
-			byte[] plaintext = null;
 			try
 			{
-				plaintext = protector.unprotect(protectedBytes);
-				String secret = new String(plaintext, StandardCharsets.US_ASCII);
-				credential = new DiscordDeviceCredential(
-					file.userId,
-					file.displayName,
-					file.relayUrl,
-					secret
-				);
+				protector.validateCiphertext(protectedBytes);
 			}
 			finally
 			{
 				Arrays.fill(protectedBytes, (byte) 0);
-				if (plaintext != null)
-				{
-					Arrays.fill(plaintext, (byte) 0);
-				}
 			}
+			pendingCredential = file;
+			if (protector.isAvailable() && !protector.requiresBackgroundThread()) openPendingCredential();
 		}
 		catch (Exception exception)
 		{
 			loadFailure = "HapticScape could not read the existing Discord device link";
 			credential = null;
 			LOG.log(Level.WARNING, loadFailure, exception);
+		}
+	}
+
+	boolean requiresBackgroundThread() { return protector.requiresBackgroundThread(); }
+
+	boolean hasPendingCredential() { return pendingCredential != null && loadFailure == null; }
+
+	private void openPendingCredential()
+	{
+		if (pendingCredential == null) return;
+		CredentialFile file = pendingCredential;
+		byte[] protectedBytes = Base64.getDecoder().decode(file.protectedSecret);
+		byte[] plaintext = null;
+		try
+		{
+			plaintext = protector.unprotect(protectedBytes);
+			credential = new DiscordDeviceCredential(file.userId, file.displayName, file.relayUrl,
+				new String(plaintext, StandardCharsets.US_ASCII));
+			credential.validate();
+			pendingCredential = null;
+		}
+		catch (SecretStoreAccessException retryable)
+		{
+			// Keep the file and pending payload intact; the next explicit attempt can retry.
+			throw retryable;
+		}
+		catch (RuntimeException damaged)
+		{
+			loadFailure = "HapticScape could not read the existing Discord device link";
+			credential = null;
+			throw new IllegalStateException(loadFailure, damaged);
+		}
+		finally
+		{
+			Arrays.fill(protectedBytes, (byte) 0);
+			if (plaintext != null) Arrays.fill(plaintext, (byte) 0);
 		}
 	}
 

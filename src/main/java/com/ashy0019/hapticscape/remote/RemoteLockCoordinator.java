@@ -25,6 +25,14 @@ final class RemoteLockCoordinator
 	private final Consumer<SettingsLockProposal> proposalPublisher;
 	private final Consumer<String> namingPublisher;
 	private final BooleanSupplier protectedExitAllowed;
+	private Consumer<Runnable> secretCompletion = Runnable::run;
+	private static final java.util.concurrent.Executor SECRET_WORKER = new java.util.concurrent.ThreadPoolExecutor(
+		1, 1, 0, java.util.concurrent.TimeUnit.MILLISECONDS, new java.util.concurrent.ArrayBlockingQueue<>(16), task ->
+		{
+			Thread thread = new Thread(task, "hapticscape-saved-key-wallet");
+			thread.setDaemon(true);
+			return thread;
+		});
 
 	private volatile RemoteLockSnapshot snapshot = RemoteLockSnapshot.inactive();
 	private SettingsLockProposal controllerProposal;
@@ -61,6 +69,34 @@ final class RemoteLockCoordinator
 		this.protectedExitAllowed = Objects.requireNonNull(protectedExitAllowed, "protectedExitAllowed");
 	}
 
+	void setSecretCompletion(Consumer<Runnable> completion) { secretCompletion = completion; }
+
+	private void saveInBackground(char[] key, Consumer<char[]> save, String success)
+	{
+		RemoteLockSnapshot expected = snapshot;
+		try
+		{
+			SECRET_WORKER.execute(() ->
+			{
+				String result = success;
+				try { save.accept(key); }
+				catch (RuntimeException failure) { result = "Lock armed; unlock key could not be saved. Check your wallet."; }
+				finally { Arrays.fill(key, '\0'); }
+				String message = result;
+				secretCompletion.accept(() ->
+				{
+					if (snapshot == expected) publish(RemoteLockState.ARMED, message,
+						expected.getProfileId(), expected.getProfileName(), expected.getTargets());
+				});
+			});
+		}
+		catch (RuntimeException rejected)
+		{
+			Arrays.fill(key, '\0');
+			publish(RemoteLockState.ARMED, "Lock armed; secure key vault is busy, unlock key could not be saved");
+		}
+	}
+
 	RemoteLockSnapshot getSnapshot()
 	{
 		return snapshot;
@@ -85,6 +121,8 @@ final class RemoteLockCoordinator
 	{
 		return savedUnlockKeyStore.getUnavailableMessage();
 	}
+
+	boolean savedKeysRequireBackgroundThread() { return savedUnlockKeyStore.requiresBackgroundThread(); }
 
 	char[] revealSavedUnlockKey(String id)
 	{
@@ -434,6 +472,16 @@ final class RemoteLockCoordinator
 
 	private void handleLegacyAccepted(String lockId)
 	{
+		if (pendingControllerUnlockKey != null && savedUnlockKeyStore.isAvailable()
+			&& savedUnlockKeyStore.requiresBackgroundThread())
+		{
+			char[] key = Arrays.copyOf(pendingControllerUnlockKey, pendingControllerUnlockKey.length);
+			clearPendingControllerUnlockKey();
+			publish(RemoteLockState.ARMED, "Participant accepted; saving unlock key...");
+			saveInBackground(key, secret -> savedUnlockKeyStore.saveAcceptedKey(lockId, secret),
+				"Participant accepted; unlock key saved");
+			return;
+		}
 		String status = "Participant accepted; settings lock armed";
 		try
 		{
@@ -531,15 +579,19 @@ final class RemoteLockCoordinator
 			}
 			String name = SettingsLockProposal.normalizeProfileName(notice.profileName);
 			String status = "Lock profile \"" + name + "\" armed";
+			char[] backgroundKey = null;
 			if (pendingControllerUnlockKey != null && savedUnlockKeyStore.isAvailable())
 			{
-				savedUnlockKeyStore.saveAcceptedProfileKey(
-					notice.proposalId,
-					controllerPeerId,
-					name,
-					pendingControllerUnlockKey
-				);
-				status = "Lock profile \"" + name + "\" armed; unlock key saved";
+				if (savedUnlockKeyStore.requiresBackgroundThread())
+				{
+					backgroundKey = Arrays.copyOf(pendingControllerUnlockKey, pendingControllerUnlockKey.length);
+					status = "Lock profile armed; saving unlock key...";
+				}
+				else
+				{
+					savedUnlockKeyStore.saveAcceptedProfileKey(notice.proposalId, controllerPeerId, name, pendingControllerUnlockKey);
+					status = "Lock profile \"" + name + "\" armed; unlock key saved";
+				}
 			}
 			else if (!savedUnlockKeyStore.isAvailable())
 			{
@@ -556,6 +608,13 @@ final class RemoteLockCoordinator
 				controllerProfileName,
 				controllerProfileTargets
 			);
+			if (backgroundKey != null)
+			{
+				String subject = controllerPeerId;
+				saveInBackground(backgroundKey,
+					secret -> savedUnlockKeyStore.saveAcceptedProfileKey(notice.proposalId, subject, name, secret),
+					"Lock profile \"" + name + "\" armed; unlock key saved");
+			}
 		}
 		catch (RuntimeException e)
 		{

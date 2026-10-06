@@ -5,7 +5,7 @@ import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Controller-owned metadata for one DPAPI-protected settings unlock key. */
+/** Controller-owned metadata for one platform-protected settings unlock key. */
 public final class SavedUnlockKey
 {
 	static final int MAXIMUM_LABEL_LENGTH = 80;

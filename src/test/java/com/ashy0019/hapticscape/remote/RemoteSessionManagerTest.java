@@ -801,6 +801,39 @@ public class RemoteSessionManagerTest
 		}
 	}
 
+	@Test(timeout = 15000)
+	public void acceptedKeyWalletPromptDoesNotBlockRemoteSessionActions() throws Exception
+	{
+		Gson gson = new Gson();
+		TestRelay relay = new TestRelay();
+		MutableConfig controllerConfig = new MutableConfig(20);
+		MutableConfig participantConfig = new MutableConfig(60);
+		BlockingSecretProtector protector = new BlockingSecretProtector(new TestUnlockKeyProtector());
+		protector.blockProtect = true;
+		SavedUnlockKeyStore vault = new SavedUnlockKeyStore(gson,
+			temporaryFolder.getRoot().toPath().resolve("background-vault.json"), protector, Clock.systemUTC());
+		try (RemoteSessionManager controller = new RemoteSessionManager(gson,
+			new MemoryStore(controllerConfig), new EffectiveSettingsService(controllerConfig),
+			lockService("background-controller.json"), vault, relay);
+			RemoteSessionManager participant = new RemoteSessionManager(gson,
+				new MemoryStore(participantConfig), new EffectiveSettingsService(participantConfig),
+				lockService("background-participant.json"), relay))
+		{
+			participant.joinParticipant(controller.startController("wss://relay.example/relay").encode());
+			awaitActive(controller, participant);
+			controller.proposeSettingsLock("ABCD-EFGH-JKLM-NPQR-STUV".toCharArray());
+			participant.acceptPendingSettingsLock();
+			assertTrue(protector.entered.await(2, TimeUnit.SECONDS));
+			assertFalse(java.util.concurrent.CompletableFuture.supplyAsync(controller::canReconnect)
+				.get(1, TimeUnit.SECONDS));
+			assertTrue(vault.list().isEmpty());
+			protector.release.countDown();
+			await(() -> vault.list().size() == 1);
+			await(() -> controller.getLockSnapshot().getMessage().contains("unlock key saved"));
+		}
+		finally { protector.release.countDown(); }
+	}
+
 	private SettingsLockService lockService(String name)
 	{
 		return new SettingsLockService(

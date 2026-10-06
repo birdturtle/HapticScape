@@ -31,7 +31,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 
-/** Disconnected-only manager for DPAPI-protected post-session unlock keys. */
+/** Disconnected-only manager for platform-protected post-session unlock keys. */
 final class SavedUnlockKeysPanel extends JPanel
 {
 	private final RemoteSessionManager sessionManager;
@@ -55,6 +55,7 @@ final class SavedUnlockKeysPanel extends JPanel
 		"MMM d, yyyy h:mm a"
 	).withZone(ZoneId.systemDefault());
 	private boolean managerOpen;
+	private boolean copying;
 
 	SavedUnlockKeysPanel(RemoteSessionManager sessionManager, TextClipboard clipboard)
 	{
@@ -73,7 +74,7 @@ final class SavedUnlockKeysPanel extends JPanel
 		JPanel text = new JPanel();
 		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 		WrappedTextLabel explanation = new WrappedTextLabel(
-			"Accepted post-session unlock keys are protected by Windows. "
+			"Accepted post-session unlock keys use secure storage for your desktop account. "
 				+ "Invitations and session keys are never saved."
 		);
 		explanation.setBorder(BorderFactory.createEmptyBorder(0, 2, 3, 2));
@@ -282,7 +283,7 @@ final class SavedUnlockKeysPanel extends JPanel
 			? ""
 			: selected.getNote().isEmpty() ? "No note" : selected.getNote());
 		note.setCaretPosition(0);
-		copyButton.setEnabled(present);
+		copyButton.setEnabled(present && !copying);
 		editButton.setEnabled(present);
 		forgetButton.setEnabled(present);
 	}
@@ -290,8 +291,44 @@ final class SavedUnlockKeysPanel extends JPanel
 	private void copySelected()
 	{
 		SavedUnlockKey selected = keyList.getSelectedValue();
-		if (selected == null)
+		if (selected == null || copying) return;
+		if (sessionManager.savedKeysRequireBackgroundThread())
 		{
+			copying = true;
+			copyButton.setEnabled(false);
+			managerStatus.setPlainText("Opening saved unlock key...");
+			new javax.swing.SwingWorker<char[], Void>()
+			{
+				@Override
+				protected char[] doInBackground()
+				{
+					return sessionManager.revealSavedUnlockKey(selected.getId());
+				}
+
+				@Override
+				protected void done()
+				{
+					char[] key = null;
+					try
+					{
+						key = get();
+						clipboard.copyText(new String(key));
+						refresh();
+						managerStatus.setPlainText("Unlock key copied");
+					}
+					catch (Exception failure)
+					{
+						Throwable cause = failure.getCause();
+						showError(cause == null ? failure.getMessage() : cause.getMessage());
+					}
+					finally
+					{
+						if (key != null) Arrays.fill(key, '\0');
+						copying = false;
+						showSelectedKey();
+					}
+				}
+			}.execute();
 			return;
 		}
 		char[] key = null;

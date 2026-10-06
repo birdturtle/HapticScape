@@ -276,6 +276,13 @@ public final class RemoteSessionManager implements AutoCloseable
 			this::publishLockNamingRequired,
 			() -> permissionsCoordinator.getLocal().isProtectedExitAllowed()
 		);
+		this.lockCoordinator.setSecretCompletion(task ->
+		{
+			synchronized (RemoteSessionManager.this)
+			{
+				if (!closed) task.run();
+			}
+		});
 		this.settingsCoordinator = new RemoteSettingsCoordinator(
 			gson,
 			requiredSettingsStore,
@@ -534,6 +541,8 @@ public final class RemoteSessionManager implements AutoCloseable
 	{
 		return lockCoordinator.getSavedUnlockKeyVaultMessage();
 	}
+
+	public boolean savedKeysRequireBackgroundThread() { return lockCoordinator.savedKeysRequireBackgroundThread(); }
 
 	public char[] revealSavedUnlockKey(String id)
 	{
