@@ -1,8 +1,9 @@
 # Linux secure storage: implementation and KDE acceptance
 
 Phase 2 implements Linux secret protection. KDE acceptance is still pending;
-this is not a declaration that the Linux port is complete. Music Sync remains
-unavailable on Linux until the PipeWire phases are implemented.
+this is not a declaration that the Linux port is complete. Output-mode Music Sync
+now has an experimental [PipeWire backend](linux-pipewire-testing.md);
+application-only capture remains pending.
 
 ## Implemented behavior
 

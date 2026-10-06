@@ -122,8 +122,18 @@ the required native acceptance evidence is available.
   remained up to date from its 27-test baseline.
 - Phase 2 native acceptance remains pending: successful KDE wallet persistence,
   locking/unlocking, cancelled prompts, and actual Discord restoration.
-- Next implementation: Phase 3, PipeWire output capture. Phase 2 KDE acceptance
-  can proceed separately before claiming secure-storage support verified.
+- Phase 3 output capture is implemented: sink discovery, durable namespaced
+  identity, monitor PCM, deliberate default following, strict selected-output
+  failures, bounded helper lifecycle and graph-link validation. See
+  [linux-pipewire-testing.md](linux-pipewire-testing.md).
+- Phase 3 live signal check passed with two disposable virtual outputs: selected
+  440 Hz PCM was captured, the other sink's 997 Hz signal was excluded, and the
+  disposable outputs were removed. Physical devices, default changes, volume/mute
+  and suspend/resume still require native acceptance. Application isolation is
+  Phase 4 and remains unimplemented.
+- Phase 3 automated checks: all 527 main tests passed with no failures or skips;
+  standalone artifact verification, isolated tray protocol and keyring bindings
+  checks passed. The unchanged 27-test bridge suite remained up to date.
 - Linux now exports a native StatusNotifierItem and DBusMenu through GIO/JNA,
   replacing the ineffective AWT/Swing tray attempt. KDE renders Open and Exit;
   Exit uses the existing protected-exit flow. Closing the window hides it only

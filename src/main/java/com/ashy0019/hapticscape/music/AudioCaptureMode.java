@@ -1,6 +1,6 @@
 package com.ashy0019.hapticscape.music;
 
-/** Selects whether Music Sync follows a whole Windows output or one application. */
+/** Selects whether Music Sync follows a whole desktop output or one application. */
 public enum AudioCaptureMode
 {
 	OUTPUT("Entire output"),

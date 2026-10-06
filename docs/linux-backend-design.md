@@ -2,7 +2,9 @@
 
 The routing descriptions below record the Phase 1 baseline. Phase 2 now wires
 Linux secret protection; see [Linux keyring implementation and testing](linux-keyring-testing.md)
-for current storage behavior and pending acceptance.
+for current storage behavior and pending acceptance. Phase 3 now implements
+output capture; see [PipeWire implementation and testing](linux-pipewire-testing.md)
+for current audio behavior. The routing section below remains the Phase 1 record.
 
 ## Routing and current capability
 

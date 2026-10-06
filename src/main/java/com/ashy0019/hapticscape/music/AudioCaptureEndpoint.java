@@ -25,7 +25,7 @@ public final class AudioCaptureEndpoint
 
 	public static AudioCaptureEndpoint systemDefault()
 	{
-		return new AudioCaptureEndpoint(SYSTEM_DEFAULT_ID, "Default Windows output");
+		return new AudioCaptureEndpoint(SYSTEM_DEFAULT_ID, "Default system output");
 	}
 
 	public static AudioCaptureEndpoint unavailable(String id, String previousName)
@@ -101,6 +101,6 @@ public final class AudioCaptureEndpoint
 		{
 			return normalized;
 		}
-		return id.isEmpty() ? "Default Windows output" : "Previously selected output";
+		return id.isEmpty() ? "Default system output" : "Previously selected output";
 	}
 }

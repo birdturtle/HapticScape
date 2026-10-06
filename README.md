@@ -509,7 +509,7 @@ Named local test profiles are stored under:
 
 Secret stores use dedicated protection where supported. Saved unlock keys and Discord device credentials use Windows DPAPI.
 
-The experimental Linux backend uses Secret Service through libsecret, with authenticated encrypted file payloads and keyring-held encryption keys. KDE acceptance remains pending; see [Linux keyring implementation and testing](docs/linux-keyring-testing.md). Linux Music Sync is still pending the PipeWire implementation.
+The experimental Linux backend uses Secret Service through libsecret, with authenticated encrypted file payloads and keyring-held encryption keys. KDE acceptance remains pending; see [Linux keyring implementation and testing](docs/linux-keyring-testing.md). Output-mode Music Sync has an experimental [PipeWire backend](docs/linux-pipewire-testing.md); application-only capture remains pending.
 
 ## FAQ
 

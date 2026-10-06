@@ -28,7 +28,7 @@ public class DesktopBackendRoutingTest
 	}
 
 	@Test
-	public void linuxAndUnsupportedPlatformsFailClosedWithoutAdvertisingCapture()
+	public void linuxRoutesOutputAndUnsupportedFeaturesFailClosed()
 	{
 		for (DesktopPlatform platform : new DesktopPlatform[] {
 			DesktopPlatform.LINUX, DesktopPlatform.UNSUPPORTED })
@@ -59,10 +59,19 @@ public class DesktopBackendRoutingTest
 					}
 				}
 			}
-			assertTrue(DesktopAudioCaptureSources.endpointCatalog(platform).listActiveEndpoints().isEmpty());
+			if (platform == DesktopPlatform.LINUX)
+			{
+				assertTrue(DesktopAudioCaptureSources.endpointCatalog(platform) instanceof PipeWireAudioEndpointCatalog);
+				assertTrue(DesktopAudioCaptureSources.factory(platform).create(
+					AudioCaptureEndpoint.systemDefault()) instanceof PipeWireLoopbackCapture);
+			}
+			else
+			{
+				assertTrue(DesktopAudioCaptureSources.endpointCatalog(platform).listActiveEndpoints().isEmpty());
+				assertUnavailable(DesktopAudioCaptureSources.factory(platform).create(
+					AudioCaptureEndpoint.systemDefault()), platform);
+			}
 			assertTrue(DesktopAudioCaptureSources.applicationCatalog(platform).listActiveApplications().isEmpty());
-			assertUnavailable(DesktopAudioCaptureSources.factory(platform).create(
-				AudioCaptureEndpoint.systemDefault()), platform);
 			assertUnavailable(DesktopAudioCaptureSources.factory(platform).createApplication(
 				new AudioCaptureApplication("example", "Example")), platform);
 		}

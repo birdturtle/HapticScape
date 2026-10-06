@@ -13,7 +13,7 @@ public class AudioCaptureEndpointTest
 	{
 		AudioCaptureEndpoint fallback = AudioCaptureEndpoint.fromPersisted(null, null);
 		assertTrue(fallback.isSystemDefault());
-		assertEquals("Default Windows output", fallback.getDisplayName());
+		assertEquals("Default system output", fallback.getDisplayName());
 
 		AudioCaptureEndpoint missing = AudioCaptureEndpoint.unavailable(
 			"endpoint-2",

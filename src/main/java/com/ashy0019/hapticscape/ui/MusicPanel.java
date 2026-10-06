@@ -627,7 +627,7 @@ final class MusicPanel extends JPanel
 					sourceScanRunning = false;
 					refreshSourcesButton.setText("Refresh");
 					refreshSourcesButton.setEnabled(!captureSourceRemote);
-					sourceHint.setText("Unable to list Windows audio outputs.");
+					sourceHint.setText("Unable to list audio outputs.");
 					sourceHint.setToolTipText(failure.getMessage());
 				});
 			}
@@ -731,7 +731,7 @@ final class MusicPanel extends JPanel
 					sourceScanRunning = false;
 					refreshSourcesButton.setText("Refresh");
 					refreshSourcesButton.setEnabled(!captureSourceRemote);
-					sourceHint.setText("Unable to list Windows mixer applications.");
+					sourceHint.setText("Unable to list playback applications.");
 					sourceHint.setToolTipText(failure.getMessage());
 				});
 			}
