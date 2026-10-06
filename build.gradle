@@ -305,3 +305,13 @@ tasks.register('verifyPipeWireOutput', JavaExec) {
 	description = 'Checks live selected-output PCM and isolation using disposable PipeWire sinks.'
 	onlyIf { System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('linux') }
 }
+
+tasks.register('verifyPipeWireApplication', JavaExec) {
+	dependsOn tasks.named('testClasses')
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.ashy0019.hapticscape.integration.desktop.PipeWireApplicationSmoke'
+	args '--live-virtual-sink'
+	group = LifecycleBasePlugin.VERIFICATION_GROUP
+	description = 'Checks same-sink application isolation, multiple streams, playback and cleanup with generated PCM.'
+	onlyIf { System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('linux') }
+}

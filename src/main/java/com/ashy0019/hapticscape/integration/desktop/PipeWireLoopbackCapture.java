@@ -58,13 +58,14 @@ public final class PipeWireLoopbackCapture implements AudioCaptureSource
 						{
 							session.close();
 							// Feed a complete silent analyzer window while deliberately reconnecting.
-							if (!closed) listener.onSamples(new float[2048], PipeWirePcm.SAMPLE_RATE, 1.0);
+							if (!closed) listener.onSamples(new float[0], PipeWirePcm.SAMPLE_RATE, 0.0);
 						}
 						session = new Session(target);
 					}
 					boolean linked = graph.linkedOnlyTo(session.name, target);
 					if (linked && !session.linked) session.samples.clear();
 					session.linked = linked;
+					session.muted = target.muted;
 					nextGraph = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(linked ? 500 : 100);
 				}
 				if (session.failure != null) throw new IllegalStateException("PipeWire capture stopped; check the output and restart Music Sync", session.failure);
@@ -80,7 +81,7 @@ public final class PipeWireLoopbackCapture implements AudioCaptureSource
 						session.announced = true;
 					}
 					// Monitor PCM may already include gain. Never apply output gain twice.
-					if (!closed) listener.onSamples(samples, PipeWirePcm.SAMPLE_RATE, 1.0);
+					if (!closed) listener.onSamples(samples, PipeWirePcm.SAMPLE_RATE, session.muted ? 0.0 : 1.0);
 				}
 			}
 		}
@@ -116,7 +117,7 @@ public final class PipeWireLoopbackCapture implements AudioCaptureSource
 		volatile long lastSamples = opened;
 		volatile Throwable failure;
 		volatile boolean stopping;
-		boolean linked, announced;
+		boolean linked, announced, muted;
 		Session(PipeWireGraph.Sink target)
 		{
 			this.target = target;

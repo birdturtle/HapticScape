@@ -151,7 +151,9 @@ public class PipeWireCaptureTest
 		@Override public void onStarted(String description) { started.countDown(); }
 		@Override public void onSamples(float[] mono, int rate, double volume)
 		{
-			assertEquals(48000, rate); assertEquals(1, volume, 0);
+			assertEquals(48000, rate);
+			if (volume == 0) { assertEquals(0, mono.length); return; }
+			assertEquals(1, volume, 0);
 			if (mono[0] != 0) { nonzero.incrementAndGet(); samples.countDown(); }
 		}
 		@Override public void onError(String message, Throwable failure) { error = message; failed.countDown(); }

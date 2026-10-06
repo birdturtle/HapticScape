@@ -210,7 +210,7 @@ On wide windows, the Forge can remain visible beside the main workspace. On smal
 
 ### Music sync
 
-Music sync is available on Windows. **Entire output** analyzes a selected Windows output endpoint with WASAPI loopback capture. **Application audio** follows the local peak meter for one application currently represented in Windows Volume Mixer, allowing music or a game client to drive haptics without reacting to every system sound. **Default Windows output** preserves the original follow-the-system behavior, and other active render endpoints—including generic virtual audio routes—remain selectable.
+Music sync uses PCM audio capture on Windows and experimentally on Linux. **Entire output** analyzes a selected output using WASAPI on Windows or PipeWire on Linux. **Application audio** captures one playback application, allowing music or a game client to drive haptics without reacting to every system sound. **Default system output** follows the system default; other active output endpoints remain selectable. Linux application capture groups streams by the application's advertised identity; see [implementation and acceptance](docs/linux-application-capture-testing.md).
 
 Controls include:
 
@@ -509,7 +509,7 @@ Named local test profiles are stored under:
 
 Secret stores use dedicated protection where supported. Saved unlock keys and Discord device credentials use Windows DPAPI.
 
-The experimental Linux backend uses Secret Service through libsecret, with authenticated encrypted file payloads and keyring-held encryption keys. KDE acceptance remains pending; see [Linux keyring implementation and testing](docs/linux-keyring-testing.md). Output-mode Music Sync has an experimental [PipeWire backend](docs/linux-pipewire-testing.md); application-only capture remains pending.
+The experimental Linux backend uses Secret Service through libsecret, with authenticated encrypted file payloads and keyring-held encryption keys. KDE acceptance remains pending; see [Linux keyring implementation and testing](docs/linux-keyring-testing.md). Music Sync has experimental PipeWire backends for [output capture](docs/linux-pipewire-testing.md) and [application-only capture](docs/linux-application-capture-testing.md). Linux desktop installation and release packaging remain unfinished.
 
 ## FAQ
 

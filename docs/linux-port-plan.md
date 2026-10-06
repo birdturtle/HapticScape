@@ -9,7 +9,7 @@ user and must remain untouched and outside port commits.
 
 Initial source audit:
 
-| Area | Windows implementation | Current Linux behavior |
+| Area | Windows implementation | Initial Linux behavior |
 | --- | --- | --- |
 | Saved unlock keys | Current-user DPAPI through `UnlockKeyProtector` | Factory selects DPAPI; unavailable |
 | Discord device credential | Separate current-user DPAPI protector | Factory selects DPAPI; unavailable |
@@ -130,7 +130,7 @@ the required native acceptance evidence is available.
   440 Hz PCM was captured, the other sink's 997 Hz signal was excluded, and the
   disposable outputs were removed. Physical devices, default changes, volume/mute
   and suspend/resume still require native acceptance. Application isolation is
-  Phase 4 and remains unimplemented.
+  implemented separately in Phase 4.
 - Phase 3 automated checks: all 527 main tests passed with no failures or skips;
   standalone artifact verification, isolated tray protocol and keyring bindings
   checks passed. The unchanged 27-test bridge suite remained up to date.
@@ -139,3 +139,19 @@ the required native acceptance evidence is available.
   Exit uses the existing protected-exit flow. Closing the window hides it only
   with a registered tray host. Missing/lost hosts leave or restore the window.
   See [linux-tray-testing.md](linux-tray-testing.md) for checks and acceptance.
+- Phase 4 application capture is implemented: playback discovery, durable
+  case-safe identities, multi-stream grouping, explicit non-lingering port taps,
+  channel conversion, stream restart, pause/exit waiting and bounded cancellation. See
+  [linux-application-capture-testing.md](linux-application-capture-testing.md).
+- Phase 4 live same-output isolation passed: two selected streams were captured,
+  a separate application's signal was excluded, all three signals remained in
+  playback, and owned capture nodes were removed without deleting playback links.
+  Real applications, volume/mute, physical routes and suspend/resume still need
+  native acceptance. Phase 5 integration/acceptance and Linux desktop packaging
+  remain unfinished.
+- Phase 4 automated checks: all 543 main tests passed with no failures or skips;
+  the unchanged 27-test bridge suite was up to date. Standalone artifact checks,
+  isolated tray/keyring checks and the live output-capture regression passed.
+  The live application check also followed a selected stream restart.
+  Pause/resume and default-output mute are covered by fixtures; live playback-sink
+  mute/unmute silenced haptics and resumed isolated PCM.

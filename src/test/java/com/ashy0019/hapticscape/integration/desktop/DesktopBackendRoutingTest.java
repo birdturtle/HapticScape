@@ -64,16 +64,19 @@ public class DesktopBackendRoutingTest
 				assertTrue(DesktopAudioCaptureSources.endpointCatalog(platform) instanceof PipeWireAudioEndpointCatalog);
 				assertTrue(DesktopAudioCaptureSources.factory(platform).create(
 					AudioCaptureEndpoint.systemDefault()) instanceof PipeWireLoopbackCapture);
+				assertTrue(DesktopAudioCaptureSources.applicationCatalog(platform) instanceof PipeWireAudioApplicationCatalog);
+				assertTrue(DesktopAudioCaptureSources.factory(platform).createApplication(
+					new AudioCaptureApplication("example", "Example")) instanceof PipeWireApplicationCapture);
 			}
 			else
 			{
 				assertTrue(DesktopAudioCaptureSources.endpointCatalog(platform).listActiveEndpoints().isEmpty());
 				assertUnavailable(DesktopAudioCaptureSources.factory(platform).create(
 					AudioCaptureEndpoint.systemDefault()), platform);
+				assertTrue(DesktopAudioCaptureSources.applicationCatalog(platform).listActiveApplications().isEmpty());
+				assertUnavailable(DesktopAudioCaptureSources.factory(platform).createApplication(
+					new AudioCaptureApplication("example", "Example")), platform);
 			}
-			assertTrue(DesktopAudioCaptureSources.applicationCatalog(platform).listActiveApplications().isEmpty());
-			assertUnavailable(DesktopAudioCaptureSources.factory(platform).createApplication(
-				new AudioCaptureApplication("example", "Example")), platform);
 		}
 	}
 

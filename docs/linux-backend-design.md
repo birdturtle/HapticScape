@@ -5,6 +5,7 @@ Linux secret protection; see [Linux keyring implementation and testing](linux-ke
 for current storage behavior and pending acceptance. Phase 3 now implements
 output capture; see [PipeWire implementation and testing](linux-pipewire-testing.md)
 for current audio behavior. The routing section below remains the Phase 1 record.
+Phase 4 also implements [application-only PCM capture](linux-application-capture-testing.md).
 
 ## Routing and current capability
 

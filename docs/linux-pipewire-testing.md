@@ -1,7 +1,7 @@
 # Phase 3: PipeWire output capture
 
 Linux output-mode Music Sync now uses `pw-dump` and `pw-cat` helper processes.
-Application-only capture is still pending Phase 4. This is an experimental source
+Application-only capture is implemented in [Phase 4](linux-application-capture-testing.md). This is an experimental source
 backend, not a declaration that the Linux release or all desktop integrations are
 supported.
 
@@ -26,6 +26,8 @@ the two channels for the shared analyzer and sanitizes nonfinite samples. PCM
 stays in bounded memory buffers and is never written to disk. Gain is passed to
 the analyzer as 1.0, avoiding a second application of gain already in the monitor.
 Actual hardware output-volume and mute behavior still require acceptance.
+Sink mute is explicitly passed as zero gain, so monitor audio cannot keep haptics
+active while that output is muted.
 
 The stream forbids session-manager fallback, external target moves and automatic
 reconnection. Its actual graph links are verified against the resolved sink

@@ -3,7 +3,7 @@ package com.ashy0019.hapticscape.music;
 import java.util.Collections;
 import java.util.List;
 
-/** Lists local applications currently represented in the Windows audio mixer. */
+/** Lists local applications currently represented in the desktop playback graph. */
 @FunctionalInterface
 public interface AudioCaptureApplicationCatalog
 {

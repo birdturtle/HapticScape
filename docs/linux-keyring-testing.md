@@ -3,7 +3,8 @@
 Phase 2 implements Linux secret protection. KDE acceptance is still pending;
 this is not a declaration that the Linux port is complete. Output-mode Music Sync
 now has an experimental [PipeWire backend](linux-pipewire-testing.md);
-application-only capture remains pending.
+application-only capture is also implemented experimentally; see
+[application capture testing](linux-application-capture-testing.md).
 
 ## Implemented behavior
 

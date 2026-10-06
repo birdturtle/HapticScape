@@ -37,7 +37,7 @@ final class PipeWireGraph
 				if (name.isEmpty() || !serial.matches("[0-9]+") || !object.has("id")) continue;
 				String description = text(props, "node.description");
 				if (description.isEmpty()) description = text(props, "node.nick");
-				sinks.add(new Sink(object.get("id").getAsInt(), serial, name, description.isEmpty() ? name : description));
+				sinks.add(new Sink(object.get("id").getAsInt(), serial, name, description.isEmpty() ? name : description, nodeMuted(info)));
 			}
 			if (text(object, "type").equals("PipeWire:Interface:Metadata")
 				&& text(object(object, "props"), "metadata.name").equals("default")
@@ -122,6 +122,23 @@ final class PipeWireGraph
 	{
 		return ENDPOINT_PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(name.getBytes(StandardCharsets.UTF_8));
 	}
+	boolean defaultMuted()
+	{
+		return sinks.stream().anyMatch(sink -> sink.name.equals(defaultSink) && sink.muted);
+	}
+	static boolean nodeMuted(JsonObject info)
+	{
+		JsonElement params = object(info, "params").get("Props");
+		if (params == null || !params.isJsonArray()) return false;
+		for (JsonElement entry : params.getAsJsonArray())
+			if (entry.isJsonObject())
+				for (String key : List.of("mute", "softMute"))
+				{
+					JsonElement value = entry.getAsJsonObject().get(key);
+					if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean() && value.getAsBoolean()) return true;
+				}
+		return false;
+	}
 	private static JsonObject object(JsonObject object, String key)
 	{
 		JsonElement value = object.get(key);
@@ -136,9 +153,15 @@ final class PipeWireGraph
 	{
 		final int id;
 		final String serial, name, description;
+		final boolean muted;
 		Sink(int id, String serial, String name, String description)
 		{
+			this(id, serial, name, description, false);
+		}
+		Sink(int id, String serial, String name, String description, boolean muted)
+		{
 			this.id = id; this.serial = serial; this.name = name; this.description = description;
+			this.muted = muted;
 		}
 		boolean sameTarget(Sink other) { return name.equals(other.name) && serial.equals(other.serial); }
 	}

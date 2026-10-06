@@ -73,7 +73,8 @@ public final class DesktopAudioCaptureSources
 	static AudioCaptureSource application(DesktopPlatform platform, AudioCaptureApplication application)
 	{
 		return platform == DesktopPlatform.WINDOWS
-			? new WasapiApplicationLoopbackCapture(application) : unavailable(platform);
+			? new WasapiApplicationLoopbackCapture(application)
+			: platform == DesktopPlatform.LINUX ? new PipeWireApplicationCapture(application) : unavailable(platform);
 	}
 
 	static AudioCaptureEndpointCatalog endpointCatalog(DesktopPlatform platform)
@@ -86,14 +87,13 @@ public final class DesktopAudioCaptureSources
 	static AudioCaptureApplicationCatalog applicationCatalog(DesktopPlatform platform)
 	{
 		return platform == DesktopPlatform.WINDOWS
-			? new WasapiAudioApplicationCatalog() : AudioCaptureApplicationCatalog.empty();
+			? new WasapiAudioApplicationCatalog()
+			: platform == DesktopPlatform.LINUX ? new PipeWireAudioApplicationCatalog() : AudioCaptureApplicationCatalog.empty();
 	}
 
 	private static AudioCaptureSource unavailable(DesktopPlatform platform)
 	{
-		String message = platform == DesktopPlatform.LINUX
-			? "Music Sync: Linux PipeWire application-only capture is not implemented yet; choose Output capture"
-			: "Music Sync capture is unavailable on this platform";
+		String message = "Music Sync capture is unavailable on this platform";
 		return new AudioCaptureSource()
 		{
 			@Override

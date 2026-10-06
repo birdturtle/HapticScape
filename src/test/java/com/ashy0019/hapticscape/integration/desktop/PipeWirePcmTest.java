@@ -41,4 +41,20 @@ public class PipeWirePcmTest
 
 	@Test(expected = EOFException.class)
 	public void rejectsPartialStereoFrame() throws Exception { PipeWirePcm.read(new ByteArrayInputStream(new byte[9])); }
+
+	@Test
+	public void decodesMonoAndMultichannelFrames() throws Exception
+	{
+		ByteBuffer mono = ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).putFloat(.25f).putFloat(-.5f);
+		assertArrayEquals(new float[] { .25f, -.5f }, PipeWirePcm.read(new ByteArrayInputStream(mono.array()), 1), 0);
+		ByteBuffer surround = ByteBuffer.allocate(24).order(ByteOrder.nativeOrder());
+		for (float value : new float[] { 1, .5f, 0, -.5f, -1, Float.NaN }) surround.putFloat(value);
+		assertArrayEquals(new float[] { 0 }, PipeWirePcm.read(new ByteArrayInputStream(surround.array()), 6), 0);
+	}
+
+	@Test(expected = EOFException.class)
+	public void rejectsTruncatedMultichannelFrame() throws Exception
+	{
+		PipeWirePcm.read(new ByteArrayInputStream(new byte[25]), 6);
+	}
 }
