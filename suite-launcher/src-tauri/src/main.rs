@@ -4,6 +4,7 @@ mod auth;
 mod migration;
 mod processes;
 mod storage;
+mod tray;
 mod updates;
 
 use auth::{AccountState, Callback, Phase};
@@ -239,7 +240,11 @@ async fn launch_app(
         Ok(if mode == "play" { "HapticScape and LumBridge launched." } else { "HapticScape is ready." }.into())
     }).await.map_err(|_| "The launch task failed.".to_string())?;
     if minimize && result.is_ok() {
-        let _ = window.minimize();
+        if tray::available(window.app_handle()) {
+            let _ = window.hide();
+        } else {
+            let _ = window.minimize();
+        }
     }
     result
 }
@@ -675,6 +680,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
@@ -683,11 +689,11 @@ fn main() {
             #[cfg(target_os = "linux")]
             {
                 use gtk::prelude::*;
-                gtk::Window::set_default_icon_name("com.hapticscape.launcher");
+                gtk::Window::set_default_icon_name("com.hapticscape.launcher.suite");
                 if let Some(window) = app.get_webview_window("main") {
                     window
                         .gtk_window()?
-                        .set_icon_name(Some("com.hapticscape.launcher"));
+                        .set_icon_name(Some("com.hapticscape.launcher.suite"));
                 }
             }
             let installed = std::env::current_exe()
@@ -723,7 +729,20 @@ fn main() {
                     .user_agent("HapticScape-Launcher/0.1")
                     .build()?,
             });
+            if let Err(error) = tray::setup(app) {
+                eprintln!("Cannot create launcher tray: {error}");
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main"
+                    && tray::available(window.app_handle())
+                    && window.hide().is_ok()
+                {
+                    api.prevent_close();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             launcher_status,

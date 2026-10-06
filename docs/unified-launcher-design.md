@@ -1,8 +1,8 @@
 # Unified launcher design
 
-Status: Tauri development prototype implemented, 2026-10-06.
-Linux Jagex sign-in and Play launch accepted by the user. Windows execution,
-packaging, and coordinated installation remain acceptance work; this is not a completed launcher replacement.
+Status: unified launcher beta published, 2026-10-06.
+Linux Jagex sign-in, Play launch, and launcher-driven beta updates accepted by the user.
+Windows packaging and migration checks pass in CI; hands-on Windows acceptance remains pending.
 
 ## Product direction
 
@@ -311,12 +311,14 @@ solely because those preload threads survived the main-thread exception.
 ## Launcher-driven suite updates
 
 The local Updates page compares semantic versions and offers **Install update and
-restart** only for a newer stable release with the matching OS/architecture package,
+restart** only for a newer selected-channel release with the matching OS/architecture package,
 checksum and `HapticScape-Suite-VERSION.json` descriptor. Release publishers must
 attach that descriptor alongside the existing Windows ZIP/LumBridge ZIP/checksums
 and the Linux `.tar.gz`/checksum (the `.run`/`.deb` remain installation downloads).
 Both packagers now generate the descriptor. Existing releases without it are shown
-but cannot be installed as suite updates. No release is published automatically.
+but cannot be installed as suite updates. No release is published automatically. Settings offers an opt-in beta channel,
+which includes published prereleases and selects the highest semantic version;
+the default stable channel continues using GitHub’s latest stable release.
 
 The backend re-fetches the release before installation, checks exact repository/tag
 asset URLs, streams bounded downloads, verifies SHA-256, rejects unsafe archive
@@ -346,11 +348,53 @@ Coverage includes version/asset selection, trusted repository URLs, manifest mis
 archive traversal/link rejection, controlled Linux activation/rollback, real Windows
 migration transactions, extraction/runtime checks on both actual platform archives,
 and a Linux Xvfb test of the packaged helper starting the real updated launcher then
-rolling back a deliberately broken one. Live download/restart acceptance still needs
-a published compatible release. The download progress currently shows its phase,
+rolling back a deliberately broken one. The user accepted the live Linux beta.1 to beta.2 launcher update. The download progress currently shows its phase,
 not a byte-level progress bar; app data and account sessions survive restarts.
 
 Saved preferences also contain component paths. On a versioned installation,
 startup now rebases bundled paths to the active release while preserving external
 JAR/Java overrides, the profile and preferences. This prevents a preference save
 from pinning Java/apps to an older retained payload after the launcher updates.
+
+
+## Post-beta cleanup and remaining acceptance
+
+HapticScape no longer displays its own update controls or runs the old Java
+release-check/preferences services. Its version label remains. The unified
+launcher owns suite updates; Windows compatibility and migration helpers remain
+for existing installations. Old updater preference files are left untouched.
+
+The user accepted launcher-driven Linux beta updates. Remaining work includes
+hands-on Windows account/Play and legacy migration acceptance and automatic
+account token refresh. Expired sessions currently require signing in again.
+The user attributed the apparent Wayland startup failure to an old launcher
+instance still running; it is no longer tracked as an unresolved Wayland issue.
+
+Update checks show a Checking state and the saved Stable/Beta channel. Errors
+remain on the Updates page until another check instead of disappearing with a
+toast or being overwritten by an old installation result. Rechecking clears stale
+release details and installation actions.
+
+
+## Launcher tray and identity
+
+The launcher icon combines the existing HapticScape crystal and LumBridge bridge
+icons, with an editable SVG and native PNG/ICO exports. The sidebar, window,
+application entry, Windows bootstrap and tray share this launcher identity;
+individual app cards retain their own icons.
+
+X hides the main window to the tray. Restore shows and focuses it; Exit quits
+only the launcher. Reopening the launcher also restores its existing window.
+Update handoff still exits explicitly. Tray Exit is ignored during installation
+to avoid interrupting verification. Without a tray or a Linux StatusNotifier
+watcher, X closes normally so the window cannot become inaccessible.
+
+The Play preference hides the launcher to the tray after a successful launch,
+falling back to normal minimization if no tray host is available. Its persisted
+preference key is unchanged. Linux uses a distinct combined-icon theme name
+(`com.hapticscape.launcher.suite`) to avoid reusing the cached HapticScape icon;
+the desktop application identifier stays `com.hapticscape.launcher`.
+
+KDE taskbar acceptance passed after switching the desktop entry to the direct
+installed `current/icon.png` path and reopening the launcher. Installers now
+write direct icon paths; the separate theme name still serves the GTK window.

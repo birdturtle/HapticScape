@@ -15,7 +15,7 @@ Prebuilt releases target Windows 10 and newer.
 
 | Component | Purpose |
 | --- | --- |
-| **HapticScape** | Standalone desktop application. Owns haptics, clicks, music sync, settings, Remote Play, safety controls, updates, and the UI. |
+| **HapticScape** | Standalone desktop application. Owns haptics, clicks, music sync, settings, Remote Play, safety controls, and the UI. |
 | **Local Event Bridge** | Small RuneLite-side plugin that observes an allowlisted set of gameplay facts and publishes neutral events to HapticScape over localhost. |
 | **LumBridge** | RuneLite package with the Local Event Bridge built in. HapticScape 3 installs the matching LumBridge release automatically when it is missing. |
 | **Intiface Central** | Connects supported haptic devices and exposes them to HapticScape over the Buttplug protocol. |
@@ -432,22 +432,18 @@ Controllers can keep accepted unlock keys in a local vault.
 
 ### Updates
 
-The packaged Windows launcher handles stable release checks.
+The unified launcher handles updates for HapticScape, LumBridge, and the bundled Java runtime.
+HapticScape itself no longer has update controls.
 
-- Check GitHub Releases automatically or manually.
-- Install updates automatically or ask before installation.
-- Notify without enabling automatic installation.
-- Skip one specific version.
-- Verify downloaded ZIPs with published SHA-256 checksums.
-- Validate staged HapticScape packages before replacement.
-- Restore the previous HapticScape bundle if installation fails.
-- Start the installed version when GitHub cannot be reached.
+In launcher Settings, choose whether to check at startup or include beta updates,
+then save preferences. Both options default to off. The Updates page provides
+**Check for updates** and **Install update and restart** for compatible newer releases.
+Close both apps before installing. Downloads are checked against SHA-256 checksums
+and validated before replacement; failed startup restores the previous installation.
 
-Draft and prerelease GitHub releases are not offered through the stable update channel.
-
-With both automatic updates and update notifications disabled, normal startup does not contact GitHub. **Check now** still performs a manual release check.
-
-For HapticScape 3 releases, the updater also looks for the matching LumBridge client. LumBridge setup is best-effort and does not block a valid HapticScape update if the companion download fails.
+Stable updates exclude prereleases. Enabling **Include beta updates** also considers
+published prereleases. Linux package-manager installations are updated through the
+package manager. Older Windows installations retain their migration helpers.
 
 ### LumBridge
 
@@ -499,7 +495,7 @@ Default Windows application data is stored under:
 %LOCALAPPDATA%\HapticScape
 ```
 
-This includes normal settings plus separate files for update preferences, persistent locks, protected-exit state, Discord device credentials, and saved unlock keys.
+This includes normal settings plus separate files for persistent locks, protected-exit state, Discord device credentials, and saved unlock keys.
 
 Named local test profiles are stored under:
 

@@ -3,18 +3,20 @@
 `hapticscape.png` and `lumbridge.png` are lossless PNG exports of the existing
 repository icons `hapticscape.ico` and `lumbridge.ico` (256 px frames).
 
-`lumbridge-background.jpg` is `RUNESCAPEPERSONAS2.jpg` from **RuneScape - Lumbridge**
-by **PlasticFunnel**, version 2.0, published on Mozilla Add-ons:
+`lumbridge-background.png` comes from a Lumbridge courtyard gameplay screenshot
+supplied by the project owner. The built-in image generation tool removed the
+floating ground-item names and prices while preserving the scene, including the
+character on the right and her ":3" speech text. CSS applies right-aligned cropping,
+blur, and dark shading for display.
 
-- Source: https://addons.mozilla.org/en-US/firefox/addon/runescape-lumbridge/
-- Publisher metadata: https://addons.mozilla.org/api/v5/addons/addon/runescape-lumbridge/
-- License declared by publisher: **Creative Commons Attribution-ShareAlike 3.0**
-  https://creativecommons.org/licenses/by-sa/3.0/
-- Download: https://addons.mozilla.org/firefox/downloads/file/2420657/runescape_lumbridge-2.0.xpi
-- Verified archive SHA-256: `b4ce39b9529c79f2570b5d966f985aa5e69246a5823ded7e45cbd40876d89008`
+Edit prompt: remove only the upper-left ground-item names and GE/HA prices;
+restore the underlying castle textures; preserve all characters, original game
+style and framing, especially the right-side character and yellow ":3" text.
+Do not add global shading or blur; the launcher supplies those effects.
 
-The JPEG is distributed unchanged. CSS applies cropping, blur, and dark shading
-for display. Adaptations of this image remain under CC BY-SA 3.0. RuneScape
-imagery belongs to Jagex Ltd.; the third-party publisher's license is the source
-of the reuse declaration. The image license does not change the application's
-code license. Attribution is also available in the launcher's Settings screen.
+RuneScape imagery belongs to Jagex Ltd. This screenshot is not represented as
+Creative Commons or covered by the application's code license. The previous
+third-party background image and its attribution have been removed.
+
+`launcher.png` combines those two existing icons. Its editable SVG composition
+is in `src-tauri/icons/launcher.svg`, with PNG and ICO exports for native icons.

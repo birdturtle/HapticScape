@@ -10,7 +10,7 @@ launcher_data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
 launcher_applications="$launcher_data_home/applications"
 launcher_icons="$launcher_data_home/icons/hicolor/256x256/apps"
 mkdir -p "$launcher_applications" "$launcher_icons"
-cp "$launcher_root/src-tauri/icons/icon.png" "$launcher_icons/com.hapticscape.launcher.png"
+cp "$launcher_root/src-tauri/icons/icon.png" "$launcher_icons/com.hapticscape.launcher.suite.png"
 # Escape Desktop Entry string values and the quoted Exec executable.
 launcher_exec=$(printf '%s' "$launcher_binary" | sed 's/\\/\\\\/g; s/"/\\"/g; s/`/\\`/g; s/\$/\\$/g; s/%/%%/g')
 cat > "$launcher_applications/com.hapticscape.launcher.desktop" <<EOF
@@ -18,7 +18,7 @@ cat > "$launcher_applications/com.hapticscape.launcher.desktop" <<EOF
 Type=Application
 Name=HapticScape Launcher
 Exec="$launcher_exec"
-Icon=com.hapticscape.launcher
+Icon=$launcher_root/src-tauri/icons/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false
 Categories=Game;Utility;

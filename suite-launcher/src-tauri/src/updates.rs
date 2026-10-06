@@ -812,6 +812,20 @@ pub fn helper_mode() -> Option<Result<(), String>> {
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "requires access to the public GitHub release feed"]
+    fn public_beta_feed_returns_a_release() {
+        tauri::async_runtime::block_on(async {
+            let http = reqwest::Client::builder()
+                .timeout(Duration::from_secs(25))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap();
+            let release = latest(&http, true).await.unwrap();
+            assert!(!release.draft);
+            println!("Beta channel selected {}", release.tag_name);
+        });
+    }
+    #[test]
     fn channels_exclude_drafts_and_order_versions() {
         let releases = || {
             serde_json::from_str::<Vec<GitHubRelease>>(

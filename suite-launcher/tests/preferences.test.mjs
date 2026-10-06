@@ -28,7 +28,11 @@ function launcher(preferences, options = {}) {
     window: { __TAURI__: { core: { async invoke(command, args) {
       calls.push({ command, args });
       if (command === 'launcher_status') return status;
-      if (command === 'check_updates') return options.release || { tag: 'v1', name: 'Release', notes: 'Notes' };
+      if (command === 'check_updates') {
+        if (options.checkGate) await options.checkGate;
+        if (options.checkError) throw options.checkError;
+        return options.release || { tag: 'v1', name: 'Release', notes: 'Notes' };
+      }
       if (command === 'install_update' && options.installError) throw options.installError;
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
@@ -97,4 +101,40 @@ test('beta preference persists and invalidates a previously checked update', asy
   assert.equal(app.element('install-update').hidden, true);
   await app.element('install-update').listeners.click();
   assert.equal(app.calls.some((call) => call.command === 'install_update'), false);
+});
+
+
+test('update check shows progress, channel and persistent failure without stale install action', async () => {
+  let finish;
+  const options = {
+    release: { tag: 'v3.2.0-beta.2', installable: true, message: 'Ready to install.' },
+    status: { updateMessage: 'Updated to an older version.' },
+  };
+  const app = launcher({ includeBetaUpdates: true, checkUpdatesOnStartup: false }, options);
+  await settle();
+  await app.element('check-updates').listeners.click();
+  assert.equal(app.element('install-update').hidden, false);
+  assert.match(app.element('release-summary').textContent, /Channel: Beta/);
+  options.checkGate = new Promise((resolve) => { finish = resolve; });
+  options.checkError = 'Cannot reach GitHub.';
+  const checking = app.element('check-updates').listeners.click();
+  assert.equal(app.element('check-updates').textContent, 'Checking…');
+  assert.equal(app.element('update-message').textContent, 'Checking for updates…');
+  assert.equal(app.element('install-update').hidden, true);
+  assert.equal(app.element('release-notes').hidden, true);
+  await app.poll();
+  assert.equal(app.element('update-message').textContent, 'Checking for updates…');
+  finish();
+  await checking;
+  assert.equal(app.element('check-updates').textContent, 'Check for updates');
+  assert.equal(app.element('update-message').textContent, 'Cannot reach GitHub.');
+  assert.match(app.element('release-summary').textContent, /failed/);
+  await app.poll();
+  assert.equal(app.element('update-message').textContent, 'Cannot reach GitHub.');
+  await app.element('install-update').listeners.click();
+  assert.equal(app.calls.some((call) => call.command === 'install_update'), false);
+  options.checkError = undefined;
+  await app.element('check-updates').listeners.click();
+  assert.equal(app.element('update-message').textContent, 'Ready to install.');
+  assert.equal(app.element('install-update').hidden, false);
 });

@@ -2,6 +2,8 @@ const invoke = window.__TAURI__?.core.invoke;
 let status;
 let busy = false;
 let updateRelease;
+let checkingUpdates = false;
+let updateFeedback = false;
 let toastTimer;
 const $ = (id) => document.getElementById(id);
 
@@ -32,15 +34,23 @@ async function action(command, args = {}) {
     else if (command === 'save_preferences') toast('Preferences saved.');
     await refresh();
     return result;
-  } catch (error) { toast(error, true); if (command === 'install_update') $('update-message').textContent = String(error); }
+  } catch (error) {
+    toast(error, true);
+    if (command === 'check_updates' || command === 'install_update') {
+      updateFeedback = true;
+      $('update-message').textContent = String(error);
+      if (command === 'check_updates') $('release-summary').textContent = 'Update check failed. Try again.';
+    }
+  }
   finally { busy = false; render(); }
 }
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
+  $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
   if (!status) return;
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
-  if (status.updateMessage && !busy && !updateRelease) $('update-message').textContent = status.updateMessage;
+  if (status.updateMessage && !busy && !updateFeedback) $('update-message').textContent = status.updateMessage;
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : 'Windows';
   for (const [kind, id] of [['hapticscape', 'haptic-status'], ['lumbridge', 'lumbridge-status']]) {
     const running = status[`${kind}Running`], installed = status[`${kind}Installed`];
@@ -125,24 +135,45 @@ $('preferences-form').addEventListener('submit', async (event) => {
   await action('save_preferences', { preferences });
   updateRelease = undefined;
   $('install-update').hidden = true;
-  $('release-summary').textContent = 'Check for updates to use the saved preferences.';
+  $('release-name').hidden = true;
+  $('release-notes').hidden = true;
+  updateFeedback = true;
+  $('update-message').textContent = 'Check for updates to use the saved preferences.';
+  $('release-summary').textContent = `Installed: ${status.installedVersion || ''}`;
 });
 $('settings-form').addEventListener('submit', async (event) => {
   event.preventDefault(); await action('save_settings', { settings: { ...status.settings, ...Object.fromEntries(new FormData(event.currentTarget)) } });
 });
 async function checkUpdates() {
-  const release = await action('check_updates');
-  if (!release) return;
-  $('release-name').textContent = release.name || release.tag; $('release-name').hidden = false;
-  updateRelease = release;
-  $('install-update').hidden = !release.installable;
-  $('update-message').textContent = release.message || '';
-  $('release-summary').textContent = `Installed: ${release.installedVersion || status.installedVersion || ''} · Latest published release: ${release.tag}${release.publishedAt ? ` · ${new Date(release.publishedAt).toLocaleDateString()}` : ''}`;
-  $('release-notes').textContent = release.notes || 'No release notes were provided.'; $('release-notes').hidden = false;
+  if (busy) return;
+  checkingUpdates = true;
+  updateFeedback = true;
+  updateRelease = undefined;
+  $('install-update').hidden = true;
+  $('release-name').hidden = true;
+  $('release-notes').hidden = true;
+  const channel = status?.settings.preferences.includeBetaUpdates ? 'Beta' : 'Stable';
+  $('release-summary').textContent = `Installed: ${status?.installedVersion || ''} · Channel: ${channel}`;
+  $('update-message').textContent = 'Checking for updates…';
+  render();
+  try {
+    const release = await action('check_updates');
+    if (!release) return;
+    $('release-name').textContent = release.name || release.tag; $('release-name').hidden = false;
+    updateRelease = release;
+    $('install-update').hidden = !release.installable;
+    $('update-message').textContent = release.message || '';
+    $('release-summary').textContent = `Installed: ${release.installedVersion || status.installedVersion || ''} · Channel: ${channel} · Latest: ${release.tag}${release.publishedAt ? ` · ${new Date(release.publishedAt).toLocaleDateString()}` : ''}`;
+    $('release-notes').textContent = release.notes || 'No release notes were provided.'; $('release-notes').hidden = false;
+  } finally {
+    checkingUpdates = false;
+    render();
+  }
 }
 $('check-updates').addEventListener('click', checkUpdates);
 $('install-update').addEventListener('click', async () => {
-  if (!updateRelease?.installable) return;
+  if (busy || !updateRelease?.installable) return;
+  updateFeedback = true;
   $('update-message').textContent = 'Downloading and verifying the update…';
   await action('install_update', { tag: updateRelease.tag });
 });

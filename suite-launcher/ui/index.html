@@ -7,7 +7,7 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand"><img src="assets/hapticscape.png" alt=""><div><strong>HapticScape</strong><small>Launcher</small></div></div>
+    <div class="brand"><img src="assets/launcher.png" alt=""><div><strong>HapticScape</strong><small>Launcher</small></div></div>
     <nav aria-label="Main navigation">
       <button class="nav-button active" data-page="home">Home</button>
       <button class="nav-button" data-page="updates">Updates</button>
@@ -47,22 +47,22 @@
       </section>
       <section class="page" id="updates" hidden>
         <article class="panel"><div class="panel-heading"><h2>HapticScape releases</h2><button class="button" id="check-updates">Check for updates</button></div><p id="release-summary">Check the latest published release.</p><h3 id="release-name" hidden></h3><pre id="release-notes" hidden></pre></article>
-        <div class="panel"><p id="update-message">Updates include the launcher, both apps, and Java.</p><button class="button primary" id="install-update" hidden>Install update and restart</button></div>
+        <div class="panel"><p id="update-message" role="status" aria-live="polite">Updates include the launcher, both apps, and Java.</p><button class="button primary" id="install-update" hidden>Install update and restart</button></div>
       </section>
       <section class="page" id="settings" hidden>
         <form class="panel preferences-form" id="preferences-form">
           <h2>Launch behavior</h2>
-          <label class="preference-row"><input type="checkbox" name="minimizeOnPlay"><span>Minimize the launcher after Play</span></label>
+          <label class="preference-row"><input type="checkbox" name="minimizeOnPlay"><span>Hide the launcher to the tray after Play</span></label>
           <h2>Updates</h2>
           <label class="preference-row"><input type="checkbox" name="checkUpdatesOnStartup"><span>Check for updates when the launcher opens</span></label>
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
           <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
         </form>
-        <p class="help-text">Closing the launcher leaves HapticScape and LumBridge running.</p>
+        <p class="help-text">Closing the window hides the launcher to the tray. Tray Exit leaves HapticScape and LumBridge running.</p>
         <details class="troubleshooting"><summary>Troubleshooting</summary>
           <form class="panel settings-form" id="settings-form"><h2>Application overrides</h2><p>Change these only if an application cannot be found. Close apps started by this launcher before changing their paths.</p><label>HapticScape JAR<input name="hapticscapeJar" required spellcheck="false"></label><label>LumBridge JAR<input name="lumbridgeJar" required spellcheck="false"></label><label>Java executable<input name="javaPath" required spellcheck="false"></label><label>HapticScape profile<input name="profile" maxlength="32" spellcheck="false"><small>Leave blank for your existing default settings. Gameplay port: 41713</small></label><button class="button" type="submit">Save overrides</button></form>
         </details>
-        <details class="credits"><summary>Image credits</summary><p>“RuneScape - Lumbridge” by PlasticFunnel, published on Mozilla Add-ons under Creative Commons Attribution-ShareAlike 3.0. Displayed with cropping, blur, and shading.</p><p class="credit-reference">Source: addons.mozilla.org/en-US/firefox/addon/runescape-lumbridge/<br>License: creativecommons.org/licenses/by-sa/3.0/</p><p>RuneScape imagery © Jagex Ltd. Unofficial launcher; not affiliated with Jagex.</p></details>
+        <details class="credits"><summary>Image credits</summary><p>RuneScape imagery © Jagex Ltd. Unofficial launcher; not affiliated with Jagex.</p></details>
       </section>
     </div>
     <footer>HapticScape · LumBridge</footer>

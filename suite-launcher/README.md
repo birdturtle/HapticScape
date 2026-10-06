@@ -1,9 +1,9 @@
-# HapticScape launcher prototype
+# HapticScape launcher
 
 Tauri 2 front door for HapticScape and LumBridge. This development prototype
 includes a native desktop UI, configurable component paths, separate Java child
 processes, immutable launch copies, and an experimental Jagex account flow.
-It does not install updates or replace the existing packaged launchers yet.
+Packaged builds include both apps and Java, with verified suite updates and rollback.
 
 ## Develop
 
@@ -25,7 +25,9 @@ Default JAR locations point into this checkout's `build/libs` and
 `runelite-bridge-client/build/libs`. Overrides for those paths and the Java executable are under
 Settings → Troubleshooting. The prototype uses gameplay port 41713 and the local profile `launcher`.
 Close an existing client using that port before testing launcher app starts.
-Closing this launcher leaves its Java applications running.
+Closing the window hides the launcher to its tray. Tray Restore reopens it;
+Tray Exit quits the launcher and leaves its Java applications running.
+Without a usable tray host, closing the window exits normally.
 
 ## Account proof
 
@@ -48,16 +50,16 @@ plaintext or replacing an unreadable account list. The previous single-account
 envelope migrates automatically. Removing an account does not terminate a running
 game or claim remote revocation. Existing credential files are untouched.
 
-Current limits: no automatic token refresh or remote revocation, no process
-adoption after launcher restart, no installer/runtime bundle, and no update
-activation, repair, or rollback. An expired game session needs reauthentication;
+Current limits: no automatic token refresh or remote revocation and no process
+adoption after launcher restart. An expired game session needs reauthentication;
 its account entry remains until explicitly removed. Windows launch and account
 tests remain required.
 
 See [the full design](../docs/unified-launcher-design.md) for the delivery plan.
 
-Settings provides persistent preferences for minimizing after Play and checking
-releases on startup. Both default to off. Preferences can be saved while Java
+Settings provides persistent preferences for hiding to the tray after Play, checking
+releases on startup, and including beta updates. All default to off.
+Beta updates include published prereleases; stable updates exclude them. Preferences can be saved while Java
 apps run. Path overrides remain restricted while managed apps are running.
 
 On Linux/Wayland, register the development launcher and taskbar icon with

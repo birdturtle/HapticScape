@@ -33,7 +33,7 @@ package manager handles updates for the `.deb` installation.
 
 To uninstall the archive installation, remove `~/.local/share/hapticscape`,
 `~/.local/share/applications/com.hapticscape.launcher.desktop`, and
-`~/.local/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.png`.
+`~/.local/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.suite.png`.
 If you set XDG_DATA_HOME, use that directory instead of `~/.local/share`.
 This leaves your account credentials and app data alone. Uninstall the `.deb`
 through your package manager.
@@ -42,3 +42,7 @@ Release builds target Ubuntu 22.04 or newer / Debian 12 or newer. A binary
 built locally on a newer distribution may require newer system libraries;
 use the CI-built package for broader compatibility. Only native x86_64 and
 ARM64 builds are supported, and each package must match your computer.
+
+The launcher tray requires libayatana-appindicator (or libappindicator) and a
+StatusNotifier host. X hides the launcher to the tray; Restore and Exit are in
+the tray menu. Exit leaves running Java applications open.

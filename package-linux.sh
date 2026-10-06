@@ -55,13 +55,13 @@ if command -v dpkg-deb >/dev/null; then
     mkdir -p "$deb/DEBIAN" "$deb/opt/hapticscape" "$deb/usr/bin" "$deb/usr/share/applications" "$deb/usr/share/icons/hicolor/256x256/apps"
     cp -a "$suite/." "$deb/opt/hapticscape/"
     ln -s /opt/hapticscape/launcher/hapticscape-launcher "$deb/usr/bin/hapticscape-launcher"
-    cp "$suite/icon.png" "$deb/usr/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.png"
+    cp "$suite/icon.png" "$deb/usr/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.suite.png"
     cat > "$deb/usr/share/applications/com.hapticscape.launcher.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=HapticScape Launcher
 Exec=/opt/hapticscape/launcher/hapticscape-launcher
-Icon=com.hapticscape.launcher
+Icon=/opt/hapticscape/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false
 Categories=Game;Utility;
@@ -71,7 +71,7 @@ Package: hapticscape-launcher
 Version: ${deb_version}
 Architecture: $deb_arch
 Maintainer: birdturtle <321293670+birdturtle@users.noreply.github.com>
-Depends: libwebkit2gtk-4.1-0, libgtk-3-0, libsecret-1-0, libx11-6, libxext6, libxi6, libxrender1, libxtst6, libfontconfig1, libasound2 | libasound2t64
+Depends: libayatana-appindicator3-1 | libappindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0, libsecret-1-0, libx11-6, libxext6, libxi6, libxrender1, libxtst6, libfontconfig1, libasound2 | libasound2t64
 Recommends: pipewire-bin, gnome-keyring | kwalletmanager
 Description: HapticScape launcher with bundled HapticScape, LumBridge and Java
 CONTROL

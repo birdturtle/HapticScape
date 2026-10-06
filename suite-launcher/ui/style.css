@@ -32,11 +32,11 @@ h2 { font-size:16px; font-weight:600; margin:0; }
 h3 { font-size:14px; font-weight:600; }
 p { margin:8px 0; }
 .launch-panel { position:relative; overflow:hidden; border:1px solid var(--border); background:var(--surface); min-height:310px; }
-.launch-background { position:absolute; inset:0; background-image:linear-gradient(90deg,#232323 0%,#232323f5 35%,#2323238a 70%,#23232340),linear-gradient(0deg,#232323 0%,transparent 70%),url("assets/lumbridge-background.jpg"); background-position:center,center,right -1000px top; background-size:cover,cover,auto 100%; background-repeat:no-repeat; filter:blur(1px); }
+.launch-background { position:absolute; inset:0; background-image:linear-gradient(90deg,#232323 0%,#232323f5 35%,#2323238a 70%,#23232340),linear-gradient(0deg,#232323 0%,transparent 70%),url("assets/lumbridge-background.png"); background-position:center,center,right center; background-size:cover; background-repeat:no-repeat; filter:blur(1px); }
 .launch-content { position:relative; padding:22px; max-width:900px; }
-.launch-title { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
-.launch-title img { width:40px; height:40px; image-rendering:pixelated; }
-.launch-title h2 { font-size:20px; }
+.launch-title { display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-left:12px; }
+.launch-title img { width:40px; height:40px; image-rendering:pixelated; opacity:0.9; mask-image:radial-gradient(ellipse at center,#000 55%,#000c 78%,#0006 100%); }
+.launch-title h2 { font-size:20px; color:var(--accent); }
 .launch-title p { color:var(--muted); font-size:12px; margin:2px 0 0; }
 .account-controls { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.18fr); gap:18px; }
 .account-controls label { display:block; color:var(--muted); font-size:12px; margin-bottom:6px; }

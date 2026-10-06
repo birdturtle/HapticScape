@@ -22,14 +22,14 @@ cp -a "$source_root/." "$release/"
 # Versioned directories allow an existing launcher/Java process to finish safely.
 ln -s "$release" "$pending"
 mv -Tf "$pending" "$install_root/current"
-cp "$release/icon.png" "$data_home/icons/hicolor/256x256/apps/com.hapticscape.launcher.png"
+cp "$release/icon.png" "$data_home/icons/hicolor/256x256/apps/com.hapticscape.launcher.suite.png"
 launcher_exec=$(printf '%s' "$install_root/current/launcher/hapticscape-launcher" | sed 's/\\/\\\\/g; s/"/\\"/g; s/`/\\`/g; s/\$/\\$/g; s/%/%%/g')
 cat > "$data_home/applications/com.hapticscape.launcher.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=HapticScape Launcher
 Exec="$launcher_exec"
-Icon=com.hapticscape.launcher
+Icon=$install_root/current/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false
 Categories=Game;Utility;

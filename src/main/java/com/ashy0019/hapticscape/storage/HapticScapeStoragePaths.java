@@ -49,11 +49,6 @@ public final class HapticScapeStoragePaths
 		return dataDirectory.resolve("discord-device.json");
 	}
 
-	public Path getUpdaterPreferencesPath()
-	{
-		return dataDirectory.resolve("updater-settings.json");
-	}
-
 	public Path getProtectedExitStatePath()
 	{
 		return dataDirectory.resolve("protected-exit-state.properties");

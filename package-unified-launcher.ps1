@@ -35,7 +35,7 @@ Copy-Item $bridge "$package\LumBridge" -Recurse -Force
 if ($LASTEXITCODE -ne 0) { throw 'The bundled Java runtime cannot run LumBridge.' }
 Move-Item "$package\HapticScape.exe" "$package\HapticScapeLegacy.exe" -Force
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-& $csc /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Windows.Forms.dll "/win32icon:$root\hapticscape.ico" "/out:$package\HapticScape.exe" "$root\launcher\UnifiedLauncherBootstrap.cs" "$root\launcher\WebViewRuntime.cs"
+& $csc /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Windows.Forms.dll "/win32icon:$root\suite-launcher\src-tauri\icons\icon.ico" "/out:$package\HapticScape.exe" "$root\launcher\UnifiedLauncherBootstrap.cs" "$root\launcher\WebViewRuntime.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Compatibility bootstrap compilation failed.' }
 # Ship Microsoft's signed Evergreen bootstrapper. It runs only if the runtime is absent.
 $installer = Join-Path $launcher 'MicrosoftEdgeWebview2Setup.exe'
