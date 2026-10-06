@@ -112,6 +112,18 @@ Windows acceptance must also verify actual DPAPI save/reopen and WASAPI behavior
 on Windows. Linux tests instantiate Windows backend classes and test shared logic;
 they do not invoke those Windows APIs.
 
+### KDE user acceptance recorded on 2026-10-06
+
+The user confirmed that the subject/controller test profiles retained their crypto
+state across application restarts. Protected-exit history also passed a live
+delivery check: five exits were recorded, two reached the controller immediately,
+and three remained queued on the subject. Reconnecting the same clients delivered
+the pending events and brought the saved lock's history to five. Reopening the
+applications alone does not reconnect Remote Play.
+
+This check does not cover wallet locking, prompt cancellation, persistence across
+logout/login, or Discord credential restoration; those remain pending.
+
 Native API references: [libsecret lookup](https://gnome.pages.gitlab.gnome.org/libsecret/func.password_lookupv_sync.html),
 [libsecret store](https://gnome.pages.gitlab.gnome.org/libsecret/func.password_storev_sync.html),
 [GIO cancellation](https://docs.gtk.org/gio/method.Cancellable.cancel.html).
