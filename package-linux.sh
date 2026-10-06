@@ -60,7 +60,8 @@ if command -v dpkg-deb >/dev/null; then
 [Desktop Entry]
 Type=Application
 Name=HapticScape Launcher
-Exec=/opt/hapticscape/launcher/hapticscape-launcher
+Exec=/opt/hapticscape/launcher/hapticscape-launcher %u
+MimeType=x-scheme-handler/hapticscape;
 Icon=/opt/hapticscape/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false

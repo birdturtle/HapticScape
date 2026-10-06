@@ -28,7 +28,8 @@ cat > "$data_home/applications/com.hapticscape.launcher.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=HapticScape Launcher
-Exec="$launcher_exec"
+Exec="$launcher_exec" %u
+MimeType=x-scheme-handler/hapticscape;
 Icon=$install_root/current/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false
@@ -37,3 +38,7 @@ DESKTOP
 command -v update-desktop-database >/dev/null && update-desktop-database "$data_home/applications" || true
 command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
 printf 'Installed HapticScape. Open HapticScape Launcher from your application menu.\n'
+
+if command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default com.hapticscape.launcher.desktop x-scheme-handler/hapticscape || true
+fi

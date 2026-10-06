@@ -51,6 +51,8 @@ function render() {
   if (!status) return;
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
   if (status.updateMessage && !busy && !updateFeedback) $('update-message').textContent = status.updateMessage;
+  $('deep-link-message').textContent = status.deepLinkMessage || '';
+  $('deep-link-message').hidden = !status.deepLinkMessage;
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : 'Windows';
   for (const [kind, id] of [['hapticscape', 'haptic-status'], ['lumbridge', 'lumbridge-status']]) {
     const running = status[`${kind}Running`], installed = status[`${kind}Installed`];

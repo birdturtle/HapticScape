@@ -17,7 +17,8 @@ cat > "$launcher_applications/com.hapticscape.launcher.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=HapticScape Launcher
-Exec="$launcher_exec"
+Exec="$launcher_exec" %u
+MimeType=x-scheme-handler/hapticscape;
 Icon=$launcher_root/src-tauri/icons/icon.png
 StartupWMClass=com.hapticscape.launcher
 Terminal=false
@@ -28,4 +29,8 @@ if command -v update-desktop-database >/dev/null 2>&1; then
 fi
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental
+fi
+
+if command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default com.hapticscape.launcher.desktop x-scheme-handler/hapticscape || true
 fi

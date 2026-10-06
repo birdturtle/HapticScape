@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -17,12 +18,11 @@ internal static class UnifiedLauncherBootstrap
             bool legacy = false;
             foreach (string arg in args)
             {
-                if (arg.StartsWith("hapticscape:", StringComparison.OrdinalIgnoreCase)
-                    || arg == "--update-settings" || arg == "--profile" || arg.StartsWith("--profile=", StringComparison.Ordinal)
+                if (arg == "--update-settings" || arg == "--profile" || arg.StartsWith("--profile=", StringComparison.Ordinal)
                     || arg == "--gameplay-port" || arg.StartsWith("--gameplay-port=", StringComparison.Ordinal)
                     || arg == "--minimized") legacy = true;
             }
-            if (!legacy) WebViewRuntime.EnsureInstalled(root);
+            if (!legacy) { RegisterProtocol(root); WebViewRuntime.EnsureInstalled(root); }
             string target = legacy ? Path.Combine(root, "HapticScapeLegacy.exe") : Path.Combine(root, "launcher", "HapticScapeLauncher.exe");
             ProcessStartInfo info = new ProcessStartInfo(target);
             info.WorkingDirectory = root;
@@ -36,6 +36,18 @@ internal static class UnifiedLauncherBootstrap
         {
             MessageBox.Show("The HapticScape launcher could not start.\n\n" + error.Message, "HapticScape", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
+        }
+    }
+    private static void RegisterProtocol(string root)
+    {
+        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Classes\hapticscape"))
+        {
+            key.SetValue("", "URL:HapticScape Protocol");
+            key.SetValue("URL Protocol", "");
+            using (RegistryKey icon = key.CreateSubKey("DefaultIcon"))
+                icon.SetValue("", Quote(Path.Combine(root, "HapticScape.exe")) + ",0");
+            using (RegistryKey command = key.CreateSubKey(@"shell\open\command"))
+                command.SetValue("", Quote(Path.Combine(root, "HapticScape.exe")) + " \"%1\"");
         }
     }
     private static string Quote(string value)

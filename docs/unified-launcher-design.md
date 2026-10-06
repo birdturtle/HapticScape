@@ -398,3 +398,13 @@ the desktop application identifier stays `com.hapticscape.launcher`.
 KDE taskbar acceptance passed after switching the desktop entry to the direct
 installed `current/icon.png` path and reopening the launcher. Installers now
 write direct icon paths; the separate theme name still serves the GTK window.
+
+### Connection links through the unified launcher
+
+The Linux desktop entry registers `x-scheme-handler/hapticscape` and passes one URI via `%u`. Per-user installers set that handler as the default. The Windows compatibility bootstrap registers its existing `HapticScape.exe` protocol target but forwards connection links to the unified launcher; legacy profile and maintenance entry points remain separate.
+
+Cold-start arguments and single-instance callbacks use the same validated queue. Links start only HapticScape, using the selected profile and its existing Java data-directory inbox. An occupied gameplay port never counts as acknowledgement. Java retains participant validation, consent, duplicate-join handling and Remote Play focus. The launcher restores from its tray on a second invocation and shows handoff errors on Home.
+
+Pending links live in launcher configuration, outside replaceable release directories. Submission markers prevent replay after Java consumes a request; a crash between enqueue and marker creation can deliver once again, so the handoff is at least once and Java's existing join deduplication remains necessary. Unix inboxes are private and records are written atomically. Links expire after five minutes, are never printed, and stay queued while update installation is in progress. Profile changes require restoring the original profile before delivering its queued link.
+
+Automated checks cover strict URI validation, profile inbox paths, private atomic writes, repeated submission and acknowledgement across restart, plus Linux desktop registration. Interactive Discord cold-start/running/tray acceptance and Windows protocol activation still require a packaged build check before publishing a corrected stable release. The existing `v3.2.0` tag is unchanged.

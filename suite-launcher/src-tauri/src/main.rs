@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod accounts;
 mod auth;
+mod deep_links;
 mod migration;
 mod processes;
 mod storage;
@@ -30,6 +31,7 @@ struct AppState {
     launches: Mutex<()>,
     http: reqwest::Client,
     updating: AtomicBool,
+    deep_link_message: Mutex<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +53,7 @@ struct Status {
     installed_version: String,
     updating: bool,
     update_message: String,
+    deep_link_message: String,
 }
 
 #[derive(Serialize)]
@@ -129,6 +132,7 @@ async fn launcher_status(
         signed_in: account.book.current().is_some(),
         signing_in: account.attempt.is_some(),
         account_message: account.message.clone(),
+        deep_link_message: state.deep_link_message.lock().unwrap().clone(),
         settings,
         platform: std::env::consts::OS,
         installed_version: app.package_info().version.to_string(),
@@ -678,7 +682,8 @@ fn main() {
     #[cfg(target_os = "linux")]
     gtk::glib::set_prgname(Some("com.hapticscape.launcher"));
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            deep_links::receive(app, &args);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
@@ -723,12 +728,15 @@ fn main() {
                 wallet: Mutex::new(()),
                 launches: Mutex::new(()),
                 updating: AtomicBool::new(false),
+                deep_link_message: Mutex::new(String::new()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
                     .redirect(reqwest::redirect::Policy::none())
                     .user_agent("HapticScape-Launcher/0.1")
                     .build()?,
             });
+            deep_links::receive(app.handle(), &std::env::args().collect::<Vec<_>>());
+            deep_links::start(app.handle().clone());
             if let Err(error) = tray::setup(app) {
                 eprintln!("Cannot create launcher tray: {error}");
             }

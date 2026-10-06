@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-installer-test-') as tempor
     root = Path(temporary)
     tools = root / 'tools'
     tools.mkdir()
-    for name in ('kbuildsycoca6', 'update-desktop-database'):
+    for name in ('kbuildsycoca6', 'update-desktop-database', 'xdg-mime'):
         tool = tools / name
         tool.write_text('#!/bin/sh\nexit 0\n')
         tool.chmod(0o755)
@@ -44,7 +44,8 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-installer-test-') as tempor
     assert (current / 'app/hapticscape-desktop.jar').read_bytes() == b'second'
     assert data.read_text() == 'preserved'
     desktop = home / '.local/share/applications/com.hapticscape.launcher.desktop'
-    assert f'Exec="{current}/launcher/hapticscape-launcher"' in desktop.read_text()
+    assert f'Exec="{current}/launcher/hapticscape-launcher" %u' in desktop.read_text()
+    assert 'MimeType=x-scheme-handler/hapticscape;' in desktop.read_text()
     second = current.resolve()
     (package / 'LumBridge/app/lumbridge.jar').unlink()
     result = subprocess.run(['bash', str(package / 'install.sh')], env=env, capture_output=True)

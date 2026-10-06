@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
     home.mkdir()
     tools = root / 'tools'
     tools.mkdir()
-    for name in ('kbuildsycoca6', 'update-desktop-database'):
+    for name in ('kbuildsycoca6', 'update-desktop-database', 'xdg-mime'):
         helper = tools / name
         helper.write_text('#!/bin/sh\nexit 0\n')
         helper.chmod(0o755)
