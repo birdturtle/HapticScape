@@ -50,6 +50,7 @@ cat "$archive" >> "$installer"
 chmod +x "$installer"
 (cd build/distribution && sha256sum "$(basename "$installer")" > "$(basename "$installer").sha256")
 if command -v dpkg-deb >/dev/null; then
+    deb_version=$(printf '%s' "$version" | sed 's/-/~/')
     deb="$stage/deb"
     mkdir -p "$deb/DEBIAN" "$deb/opt/hapticscape" "$deb/usr/bin" "$deb/usr/share/applications" "$deb/usr/share/icons/hicolor/256x256/apps"
     cp -a "$suite/." "$deb/opt/hapticscape/"
@@ -67,15 +68,15 @@ Categories=Game;Utility;
 DESKTOP
     cat > "$deb/DEBIAN/control" <<CONTROL
 Package: hapticscape-launcher
-Version: ${version/-/~}
+Version: ${deb_version}
 Architecture: $deb_arch
 Maintainer: birdturtle <321293670+birdturtle@users.noreply.github.com>
 Depends: libwebkit2gtk-4.1-0, libgtk-3-0, libsecret-1-0, libx11-6, libxext6, libxi6, libxrender1, libxtst6, libfontconfig1, libasound2 | libasound2t64
 Recommends: pipewire-bin, gnome-keyring | kwalletmanager
 Description: HapticScape launcher with bundled HapticScape, LumBridge and Java
 CONTROL
-    dpkg-deb --root-owner-group --build "$deb" "$root/build/distribution/hapticscape-launcher_${version/-/~}_${deb_arch}.deb"
-    (cd build/distribution && sha256sum "hapticscape-launcher_${version/-/~}_${deb_arch}.deb" > "hapticscape-launcher_${version/-/~}_${deb_arch}.deb.sha256")
+    dpkg-deb --root-owner-group --build "$deb" "$root/build/distribution/hapticscape-launcher_${deb_version}_${deb_arch}.deb"
+    (cd build/distribution && sha256sum "hapticscape-launcher_${deb_version}_${deb_arch}.deb" > "hapticscape-launcher_${deb_version}_${deb_arch}.deb.sha256")
 fi
 printf '{"schemaVersion":1,"version":"%s"}\n' "$version" > "$root/build/distribution/HapticScape-Suite-$version.json"
 printf 'Packages created in %s/build/distribution\n' "$root"
