@@ -68,4 +68,18 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-installer-test-') as tempor
     result = subprocess.run(['bash', str(installer)], env=env, capture_output=True)
     assert result.returncode != 0
     assert current.resolve() == third
+    # Launcher-only first install and upgrade preserve existing application data.
+    for name in ('app/hapticscape-desktop.jar', 'LumBridge/app/lumbridge.jar', 'runtime/bin/java'):
+        (package / name).unlink()
+    for name in ('bootstrap.json', 'suite.json', 'release.json'):
+        (package / 'app' / name).write_text('{"schemaVersion":1,"version":"0.4.0"}')
+    (package / 'VERSION').write_text('0.4.0')
+    subprocess.run(['bash', str(package / 'install.sh')], env=env, check=True)
+    fourth = current.resolve()
+    assert (current / 'app/bootstrap.json').is_file()
+    assert not (current / 'app/hapticscape-desktop.jar').exists()
+    assert data.read_text() == 'preserved'
+    (package / 'app/suite.json').unlink()
+    result = subprocess.run(['bash', str(package / 'install.sh')], env=env, capture_output=True)
+    assert result.returncode != 0 and current.resolve() == fourth
     print('Archive/self-extracting install, upgrades, desktop entry, retained data and invalid package rejection passed.')

@@ -2,6 +2,7 @@ const invoke = window.__TAURI__?.core.invoke;
 let status;
 let busy = false;
 let starting = false;
+let installingComponents = false;
 let updateRelease;
 let checkingUpdates = false;
 let updateFeedback = false;
@@ -50,7 +51,7 @@ async function action(command, args = {}) {
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
-  $('play').textContent = starting ? 'Starting…' : 'Play';
+  $('play').textContent = starting ? 'Starting…' : installingComponents || status?.componentsInstalling ? 'Installing…' : status?.componentsNeeded ? 'Retry installation' : 'Play';
   $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
   if (!status) return;
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
@@ -60,14 +61,14 @@ function render() {
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : 'Windows';
   for (const [kind, id] of [['hapticscape', 'haptic-status'], ['lumbridge', 'lumbridge-status']]) {
     const running = status[`${kind}Running`], installed = status[`${kind}Installed`];
-    $(id).textContent = running ? 'Running' : installed ? 'Installed' : 'Not found · Set path in Settings';
+    $(id).textContent = running ? 'Running' : installed ? 'Installed' : status.componentsNeeded ? 'Not installed' : 'Not found · Set path in Settings';
     $(id).className = `app-status ${running ? 'running' : installed ? '' : 'missing'}`;
   }
   const character = status.characters.find((item) => item.accountId === status.selectedCharacter);
-  $('play-hint').textContent = status.gameplayPortBusy && !status.hapticscapeRunning ? 'Gameplay port is in use. Close the other HapticScape client first.'
+  $('play-hint').textContent = status.componentsNeeded || installingComponents ? status.componentMessage || 'Preparing downloads…' : status.gameplayPortBusy && !status.hapticscapeRunning ? 'Gameplay port is in use. Close the other HapticScape client first.'
     : status.lumbridgeRunning ? 'LumBridge is running.' : !status.hapticscapeInstalled || !status.lumbridgeInstalled ? 'Set application paths in Settings.' : character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.';
-  $('play').disabled = busy || !status.hapticscapeInstalled || !status.lumbridgeInstalled || !character || status.lumbridgeRunning;
-  $('open-haptic').disabled = busy || !status.hapticscapeInstalled || status.hapticscapeRunning;
+  $('play').disabled = busy || installingComponents || status.updating || (!status.componentsNeeded && (!status.hapticscapeInstalled || !status.lumbridgeInstalled || !character || status.lumbridgeRunning));
+  $('open-haptic').disabled = busy || status.updating || status.componentsNeeded || !status.hapticscapeInstalled || status.hapticscapeRunning;
   $('sign-in').disabled = busy || status.signingIn;
   $('sign-in').textContent = status.signingIn ? 'Waiting for Jagex…' : 'Add account';
   $('reauthenticate').hidden = !status.needsSignIn;
@@ -134,7 +135,7 @@ async function refresh() {
 document.querySelectorAll('[data-page], [data-go]').forEach((button) => button.addEventListener('click', () => page(button.dataset.page || button.dataset.go)));
 $('accounts').addEventListener('change', (event) => action('select_account', { id: event.target.value }));
 $('remove-account').addEventListener('click', () => { if (status?.selectedAccount) action('remove_account', { id: status.selectedAccount }); });
-$('play').addEventListener('click', () => action('launch_app', { mode: 'play' }));
+$('play').addEventListener('click', () => status?.componentsNeeded ? installComponents() : action('launch_app', { mode: 'play' }));
 $('open-haptic').addEventListener('click', () => action('launch_app', { mode: 'hapticscape' }));
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));
 $('preferences-form').addEventListener('submit', async (event) => {
@@ -189,15 +190,28 @@ if (!invoke) {
   $('haptic-status').textContent = 'Desktop connection unavailable'; $('lumbridge-status').textContent = 'Desktop connection unavailable';
   $('play').disabled = true; $('open-haptic').disabled = true;
 }
+async function installComponents() {
+  if (installingComponents || status?.updating || !invoke) return;
+  installingComponents = true;
+  render();
+  try { await invoke('install_components'); }
+  catch (error) { toast(error, true); }
+  finally {
+    installingComponents = false;
+    $('settings-form').dataset.loaded = '';
+    await refresh();
+  }
+}
 async function initialize() {
   await refresh();
   if (!status) return;
   if (invoke) { try { await invoke('launcher_ready'); } catch (error) { toast(error, true); } }
+  if (status.componentsNeeded) installComponents();
   if (invoke) {
     try { await invoke('load_accounts'); } catch (error) { toast(error, true); }
   }
   await refresh();
-  if (status.settings.preferences.checkUpdatesOnStartup) await checkUpdates();
+  if (!installingComponents && !status.componentsNeeded && status.settings.preferences.checkUpdatesOnStartup) await checkUpdates();
 }
 initialize(); setInterval(refresh, 2000);
 

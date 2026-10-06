@@ -9,3 +9,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Migration fixture compilation failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Migration test compilation failed.' }
 & "$out\tests.exe" "$out\fixture.exe"
 if ($LASTEXITCODE -ne 0) { throw 'Migration transaction tests failed.' }
+& $csc /nologo /target:exe /main:SuiteInstallerTests /reference:System.dll /reference:System.Windows.Forms.dll "/out:$out\installer-tests.exe" "$PSScriptRoot\SuiteInstallerTests.cs" "$root\launcher\SuiteInstaller.cs" "$root\launcher\ApplicationLayoutValidation.cs"
+if ($LASTEXITCODE -ne 0) { throw 'Launcher installer test compilation failed.' }
+& "$out\installer-tests.exe"
+if ($LASTEXITCODE -ne 0) { throw 'Launcher installer tests failed.' }

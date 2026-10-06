@@ -33,6 +33,14 @@ function launcher(preferences, options = {}) {
         if (options.checkError) throw options.checkError;
         return options.release || { tag: 'v1', name: 'Release', notes: 'Notes' };
       }
+      if (command === 'install_components') {
+        if (options.componentGate) await options.componentGate;
+        if (options.componentError) { status.componentMessage = options.componentError; throw options.componentError; }
+        status.componentsNeeded = false;
+        status.hapticscapeInstalled = true;
+        status.lumbridgeInstalled = true;
+        status.componentMessage = '';
+      }
       if (command === 'install_update' && options.installError) throw options.installError;
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
@@ -152,4 +160,34 @@ test('expired account offers the existing browser sign-in flow and keeps its cha
   await app.element('reauthenticate').listeners.click();
   assert.equal(app.calls.some((call) => call.command === 'begin_login'), true);
   assert.equal(app.calls.some((call) => call.command === 'remove_account'), false);
+});
+
+
+test('first-run download permits account loading, reports failure and retries without starting Java', async () => {
+  let finish;
+  const options = {
+    status: { componentsNeeded: true, hapticscapeInstalled: false, lumbridgeInstalled: false, componentMessage: 'Downloading apps and Java… 42%' },
+    componentGate: new Promise((resolve) => { finish = resolve; }),
+    componentError: 'Cannot reach GitHub. Try again.',
+  };
+  const app = launcher({ checkUpdatesOnStartup: true }, options);
+  await settle();
+  assert.equal(app.calls.filter((c) => c.command === 'install_components').length, 1);
+  assert.equal(app.calls.some((c) => c.command === 'load_accounts'), true);
+  assert.equal(app.calls.some((c) => c.command === 'check_updates' || c.command === 'launch_app'), false);
+  assert.equal(app.element('play').disabled, true);
+  assert.equal(app.element('play').textContent, 'Installing…');
+  assert.match(app.element('play-hint').textContent, /42%/);
+  finish(); await settle();
+  assert.equal(app.element('play').textContent, 'Retry installation');
+  assert.equal(Boolean(app.element('play').disabled), false);
+  assert.match(app.element('play-hint').textContent, /Cannot reach GitHub/);
+  options.componentError = undefined;
+  await app.element('play').listeners.click();
+  assert.equal(app.element('play').textContent, 'Play');
+  assert.equal(app.element('haptic-status').textContent, 'Installed');
+  assert.equal(app.calls.filter((c) => c.command === 'install_components').length, 2);
+  assert.equal(app.calls.some((c) => c.command === 'launch_app'), false);
+  await app.poll();
+  assert.equal(app.calls.filter((c) => c.command === 'install_components').length, 2);
 });

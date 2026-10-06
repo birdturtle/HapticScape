@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import tarfile
 import time
 import uuid
 
@@ -15,8 +16,11 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
         assert len(debs) == 1, 'Test a directory containing only one candidate version.'
         unpacked = root / 'deb'
         subprocess.run(['dpkg-deb', '-x', str(debs[0]), str(unpacked)], check=True)
-        for component in ('launcher/hapticscape-launcher', 'runtime/bin/java', 'app/hapticscape-desktop.jar', 'LumBridge/app/lumbridge.jar'):
+        for component in ('launcher/hapticscape-launcher', 'app/bootstrap.json', 'app/release.json', 'app/suite.json'):
             assert (unpacked / 'opt/hapticscape' / component).is_file(), component
+        assert not (unpacked / 'opt/hapticscape/runtime').exists()
+        assert not (unpacked / 'opt/hapticscape/app/hapticscape-desktop.jar').exists()
+        assert not (unpacked / 'opt/hapticscape/LumBridge').exists()
         assert (unpacked / 'usr/share/applications/com.hapticscape.launcher.desktop').is_file()
         dependencies = subprocess.check_output(['dpkg-deb', '-f', str(debs[0]), 'Depends'], text=True)
         assert 'libwebkit2gtk-4.1-0' in dependencies and 'libsecret-1-0' in dependencies
@@ -34,8 +38,14 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
     env.pop('DBUS_SESSION_BUS_ADDRESS', None)
     subprocess.run(['bash', str(installer)], env=env, check=True)
     installed = home / '.local/share/hapticscape/current'
-    subprocess.run([str(installed / 'runtime/bin/java'), '-version'], env=env, check=True)
-    subprocess.run([str(installed / 'runtime/bin/java'), '-jar', str(installed / 'LumBridge/app/lumbridge.jar'), '--verify-runtime'], env=env, check=True)
+    assert (installed / 'app/bootstrap.json').is_file()
+    assert not (installed / 'runtime').exists()
+    assert not (installed / 'LumBridge').exists()
+    payload = root / 'payload'
+    with tarfile.open(str(installer).removesuffix('.run') + '.tar.gz') as archive:
+        archive.extractall(payload, filter='data')
+    bundled = payload / 'HapticScape'
+    subprocess.run([str(bundled / 'runtime/bin/java'), '-jar', str(bundled / 'LumBridge/app/lumbridge.jar'), '--verify-runtime'], env=env, check=True)
     staging = root / 'HapticScape-update-smoke'
     staging.mkdir()
     marker = staging / 'launcher-ready'
@@ -49,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
             deadline = time.monotonic() + 45
             while time.monotonic() < deadline and process.poll() is None:
                 if marker.exists() and marker.read_text() == token:
-                    print('Real Linux installer, bundled Java, installed path discovery and frontend startup passed.')
+                    print('Launcher-only Linux installer, separate Java payload and frontend startup passed.')
                     break
                 time.sleep(0.2)
             else:

@@ -415,3 +415,29 @@ Play checks the selected account before starting either application. OAuth crede
 The game session is independent of OAuth expiry. Its character-list request is checked before launch. A rejected game session triggers a silent consent request (`prompt=none`) using a fresh launcher identity, then creates a new game session from the consent identity. Redirects stay on the configured Jagex account origin, and callbacks require matching state, nonce, audience, issuer, signature and account subject. No login or consent requirement is bypassed: when Jagex requires interaction, the selected account remains saved and a Sign in again action opens the normal browser flow. Provider availability/rate-limit/network errors preserve credentials and offer retry. A missing selected character requires another selection instead of launching a different character.
 
 Mock-provider checks cover refresh rotation and omitted replacement tokens, expiry, old wallet migration, successful silent game-session renewal with signed JWTs, preserved selection, token checkpoints before later failures, explicit invalid-grant rejection, wrong nonce and transient errors. Real Jagex silent renewal and Windows acceptance still need testing; mock success does not establish that Jagex will grant a silent consent request for every saved account.
+
+
+## Launcher-only public downloads
+
+Windows users download `HapticScape-Launcher-Windows-<arch>-<version>.exe`.
+It installs the native launcher per user and creates a Start menu shortcut. Linux
+`.run` and `.deb` installers likewise contain only the launcher. No app starts on
+opening the launcher.
+
+`app/bootstrap.json` identifies these initial installs. First launch fetches the
+exact installed version's published GitHub release, including prereleases,
+independently of the user's future update channel. The existing archive downloader
+verifies the suite descriptor, SHA-256 checksum, safe extraction, component layout
+and Java runtime. Progress is visible near Play; failures retain a retry action.
+Applications and Java activate atomically under the launcher's per-user data
+`components/<version>` directory, with a completion receipt. Restarts reuse completed
+downloads; missing components trigger repair. Saved accounts, app data, profile and
+launcher preferences remain separate. Connection links wait for installation before
+Java handoff.
+
+Full suite ZIP/tar archives and their checksums remain internal release assets for
+these downloads, native updates and old Windows updater migration. There is no
+separate published LumBridge ZIP. Self-update can replace the launcher-only layout
+with a full suite; saved managed component paths then follow the updated install.
+The Debian package manager owns launcher updates; per-user application downloads
+still work without writes to `/opt`.

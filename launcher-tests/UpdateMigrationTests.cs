@@ -11,13 +11,14 @@ internal static class UpdateMigrationTests
         try {
             foreach (bool legacy in new[] { true, false })
             foreach (bool fail in new[] { false, true }) Test(root, args[0], legacy, fail);
+            foreach (bool fail in new[] { false, true }) Test(root, args[0], false, fail, true);
             Console.WriteLine("Migration transactions passed: legacy/current layouts, successful handoff and startup-failure rollback.");
             return 0;
         } catch (Exception e) { Console.Error.WriteLine(e); return 1; }
         finally { Directory.Delete(root, true); }
     }
     private static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
-    private static void Test(string root, string fixture, bool legacy, bool fail)
+    private static void Test(string root, string fixture, bool legacy, bool fail, bool bootstrap = false)
     {
         string scenario = Path.Combine(root, Guid.NewGuid().ToString("N"));
         string installed = Path.Combine(scenario, "HapticScape");
@@ -27,6 +28,17 @@ internal static class UpdateMigrationTests
         Directory.CreateDirectory(data);
         File.WriteAllText(Path.Combine(data, "pairing.json"), "existing pairing");
         Layout(installed, fixture);
+        if (bootstrap)
+        {
+            Directory.Delete(Path.Combine(installed, "runtime"), true);
+            File.Delete(Path.Combine(installed, "app", "hapticscape-client.jar"));
+            File.Delete(Path.Combine(installed, "app", "hapticscape-desktop.jar"));
+            Directory.CreateDirectory(Path.Combine(installed, "launcher"));
+            File.Copy(fixture, Path.Combine(installed, "launcher", "HapticScapeLauncher.exe"));
+            File.WriteAllText(Path.Combine(installed, "launcher", "MicrosoftEdgeWebview2Setup.exe"), "fixture");
+            File.WriteAllText(Path.Combine(installed, "app", "suite.json"), "{}");
+            File.WriteAllText(Path.Combine(installed, "app", "bootstrap.json"), "{}");
+        }
         File.WriteAllText(Path.Combine(installed, "old-version"), "old");
         if (legacy) File.Delete(Path.Combine(installed, "app", "hapticscape-desktop.jar"));
         Layout(staged, fixture);
@@ -50,7 +62,7 @@ internal static class UpdateMigrationTests
         Check(result == (fail ? 1 : 0), "unexpected transaction result");
         Check((error != null) == fail, "unexpected error reporting");
         Check(File.Exists(Path.Combine(installed, "old-version")) == fail, "old installation was not replaced/restored correctly");
-        Check(File.Exists(Path.Combine(installed, "app", "suite.json")) != fail, "suite activation/rollback failed");
+        Check(File.Exists(Path.Combine(installed, "app", "suite.json")) == (!fail || bootstrap), "suite activation/rollback failed");
         Check(File.ReadAllText(Path.Combine(data, "pairing.json")) == "existing pairing", "user data changed");
         Check(Directory.GetDirectories(scenario, "HapticScape-backup-*").Length == 0, "successful replacement or rollback left a backup");
         Check(Directory.Exists(temporary) == fail, "successful update did not clean staging");

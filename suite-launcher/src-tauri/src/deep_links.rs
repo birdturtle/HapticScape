@@ -203,7 +203,7 @@ fn submit(directory: &Path, name: &str, link: &[u8], queued: &Path) -> Result<bo
 fn deliver(app: &tauri::AppHandle, pending: &Pending, queued: &Path) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let _launch = state.launches.lock().unwrap();
-    if state.updating.load(Ordering::SeqCst) {
+    if state.updating.load(Ordering::SeqCst) || state.components.needed() {
         return Ok(false);
     }
     let settings = state.settings.lock().unwrap().clone();

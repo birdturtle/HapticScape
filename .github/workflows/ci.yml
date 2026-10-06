@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: .\launcher-tests\test-migration.ps1
 
-      - name: Build both release ZIPs
+      - name: Build launcher installer and update payload
         shell: pwsh
         env:
           RELEASE_REF_TYPE: ${{ github.ref_type }}
@@ -120,7 +120,8 @@ jobs:
         with:
           name: hapticscape-windows-packages-${{ github.sha }}
           path: |
-            build/distribution/*.zip*
+            build/distribution/HapticScape-Windows-*.zip*
+            build/distribution/HapticScape-Launcher-Windows-*.exe*
             build/distribution/HapticScape-Suite-*.json
           retention-days: 7
 

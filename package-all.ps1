@@ -5,7 +5,7 @@ param(
 
     [string]$RuneLiteVersion,
 
-    [switch]$UnifiedLauncher
+    [switch]$UnifiedLauncher = $true
 )
 
 $ErrorActionPreference = 'Stop'
@@ -106,11 +106,14 @@ try
     }
 
     Write-Host ''
-    Write-Host 'Both packages created successfully:' -ForegroundColor Green
+    if ($UnifiedLauncher) {
+        Remove-Item $bridgeZip, "$bridgeZip.sha256" -Force
+        Write-Host "User download: $(Join-Path $distributionDirectory "HapticScape-Launcher-Windows-$architecture-$Version.exe")"
+    }
+    Write-Host 'Packages created successfully:' -ForegroundColor Green
     Write-Host "  $desktopZip"
     Write-Host "  $desktopZip.sha256"
-    Write-Host "  $bridgeZip"
-    Write-Host "  $bridgeZip.sha256"
+    if (!$UnifiedLauncher) { Write-Host "  $bridgeZip"; Write-Host "  $bridgeZip.sha256" }
 }
 finally
 {

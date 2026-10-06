@@ -21,6 +21,8 @@ needs PipeWire's `pw-cat` and `pw-dump` tools. For Arch/CachyOS install the
 normal package manager. Debian/Ubuntu equivalents are `libwebkit2gtk-4.1-0`,
 `libgtk-3-0`, `libsecret-1-0`, and `pipewire-bin`.
 
+First launch downloads and verifies HapticScape, LumBridge and Java into the launcher’s per-user application data directory. Keep an internet connection available; use Retry installation if the download fails.
+
 Adding a Jagex account uses the sign-in button in the launcher. Existing
 HapticScape profiles, pairing and settings remain in their normal data location.
 

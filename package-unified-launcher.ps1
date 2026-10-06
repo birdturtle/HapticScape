@@ -50,3 +50,27 @@ $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($zip))" | Set-Content "$zip.sha256" -Encoding ASCII
 @{ schemaVersion = 1; version = $Version } | ConvertTo-Json | Set-Content (Join-Path $root "build\distribution\HapticScape-Suite-$Version.json") -Encoding UTF8
 Write-Host "Unified launcher compatibility package: $zip"
+
+# Public installer embeds only launcher files. The ZIP above is the verified
+# application payload used by first-run downloads, updates and legacy migration.
+$stub = Join-Path $root 'build\launcher-bootstrap'
+New-Item -ItemType Directory -Path "$stub\app" -Force | Out-Null
+[IO.File]::WriteAllText("$stub\app\bootstrap.json", (@{ schemaVersion = 1; version = $Version } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText("$stub\VERSION", $Version, [Text.UTF8Encoding]::new($false))
+$setup = Join-Path $root "build\distribution\HapticScape-Launcher-Windows-$Architecture-$Version.exe"
+$resources = @(
+    "/resource:$stub\VERSION,version",
+    "/resource:$package\HapticScape.exe,payload/HapticScape.exe",
+    "/resource:$launcher\HapticScapeLauncher.exe,payload/launcher/HapticScapeLauncher.exe",
+    "/resource:$installer,payload/launcher/MicrosoftEdgeWebview2Setup.exe",
+    "/resource:$package\app\release.json,payload/app/release.json",
+    "/resource:$package\app\suite.json,payload/app/suite.json",
+    "/resource:$stub\app\bootstrap.json,payload/app/bootstrap.json",
+    "/resource:$root\LICENSE,payload/licenses/LICENSE",
+    "/resource:$root\suite-launcher\ui\assets\CREDITS.md,payload/licenses/launcher-assets.md"
+)
+& $csc /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Windows.Forms.dll "/win32icon:$root\suite-launcher\src-tauri\icons\icon.ico" "/out:$setup" @resources "$root\launcher\SuiteInstaller.cs"
+if ($LASTEXITCODE -ne 0) { throw 'Launcher installer compilation failed.' }
+$hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+"$hash  $([IO.Path]::GetFileName($setup))" | Set-Content "$setup.sha256" -Encoding ASCII
+Write-Host "User download: $setup"

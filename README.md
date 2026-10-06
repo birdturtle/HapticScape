@@ -30,24 +30,18 @@ The default gameplay bridge endpoint is `127.0.0.1:41713`. It binds only to IPv4
 - Windows 10 or newer.
 - [Intiface Central](https://intiface.com/) if you want haptic device output.
 - A device supported by Intiface if you want haptic output.
-- The official [RuneLite launcher](https://runelite.net/) or another Java 11+ runtime if you use LumBridge. LumBridge checks for the RuneLite JRE first.
-
-HapticScape itself includes a packaged Java runtime. Java is only needed separately for LumBridge.
+The launcher downloads HapticScape, LumBridge and their Java runtime automatically. An internet connection is needed for the first download.
 
 ### New installation
 
-1. Open [HapticScape Releases](https://github.com/ashy0019/HapticScape/releases).
-2. Open the latest stable release.
-3. Download `HapticScape-Windows-x64-X.Y.Z.zip` or the matching package for your architecture.
-4. Extract the ZIP to a writable folder.
-5. Run `HapticScape.exe`.
-6. If LumBridge is not installed, HapticScape downloads the matching LumBridge release, verifies its SHA-256 checksum, extracts it into `HapticScape\LumBridge`, and opens it.
-7. Start Intiface Central if you use haptics.
-8. Connect your device in Intiface Central.
-9. In HapticScape, connect to Intiface. The default address is `ws://localhost:12345`.
-10. Use a low intensity and short test pattern before normal use.
+1. Open [HapticScape Releases](https://github.com/birdturtle/HapticScape/releases).
+2. Download `HapticScape-Launcher-Windows-x64-X.Y.Z.exe` from the latest release.
+3. Run it. The launcher installs for your Windows account and adds a Start menu shortcut.
+4. Wait for the launcher to download and verify HapticScape, LumBridge and Java.
+5. Add your Jagex account, choose a character and select **Play**.
+6. Connect Intiface Central if you use haptics.
 
-Keep the complete HapticScape folder together. Do not move `HapticScape.exe` away from its `app` and `runtime` folders.
+Use **HapticScape Launcher** in the Start menu thereafter. No separate LumBridge download or Java installation is needed. **Open** starts HapticScape on its own.
 
 ### Connect Intiface
 
@@ -64,34 +58,19 @@ Some devices ignore very low vibration values. Increase intensity gradually if t
 
 ### Jagex Accounts and LumBridge
 
-LumBridge is a custom RuneLite development client. Jagex Account sessions may require RuneLite's development credential setup.
-
-Use RuneLite's guide:
-
-<https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts>
-
-The usual setup is:
-
-1. Install the current official RuneLite launcher.
-2. Open **RuneLite (configure)** from the Windows Start menu.
-3. Add `--insecure-write-credentials` to **Client arguments**.
-4. Launch RuneLite through the Jagex Launcher once.
-5. Close RuneLite.
-6. Start LumBridge.
-
-This creates `.runelite/credentials.properties`. Treat that file as account credentials. Do not upload, commit, package, or send it to another person.
+Select **Add account** in the launcher and sign in to Jagex. Your account stays in the list until removed. Login credentials are stored encrypted, and the launcher renews sessions before Play when needed. No `credentials.properties` export is required.
 
 ### SmartScreen and checksums
 
 HapticScape releases are not code-signed, so Windows may show a SmartScreen warning.
 
-Each Windows ZIP also has a `.zip.sha256` file. To verify a download:
+The launcher installer has a matching `.exe.sha256` file. To verify a download:
 
 ```powershell
-Get-FileHash ".\HapticScape-Windows-x64-X.Y.Z.zip" -Algorithm SHA256
+Get-FileHash ".\HapticScape-Launcher-Windows-x64-X.Y.Z.exe" -Algorithm SHA256
 ```
 
-Compare the displayed hash with the value in the matching `.zip.sha256` file.
+Compare the displayed hash with the value in the matching `.exe.sha256` file.
 
 ## Migrating from HapticScape 2.x
 
@@ -101,16 +80,7 @@ HapticScape 2.x ran HapticScape code inside a custom RuneLite client. HapticScap
 
 ### Upgrade through the built-in updater
 
-When an existing 2.x installation updates to 3.x:
-
-1. The existing updater installs HapticScape 3 normally.
-2. The new HapticScape 3 launcher starts.
-3. If the matching LumBridge package is missing, HapticScape downloads it from the same GitHub release.
-4. The LumBridge checksum is verified.
-5. LumBridge is extracted into the HapticScape folder and opened.
-6. HapticScape starts as a separate application.
-
-A LumBridge download failure does not roll back an otherwise valid HapticScape update. HapticScape still starts and will try the companion setup again later.
+The existing updater uses the full HapticScape ZIP behind the scenes. It replaces the old entry point with the unified launcher and includes both apps and Java. Existing shortcuts continue opening the launcher; Play starts both applications.
 
 ### Settings after migration
 
@@ -602,7 +572,7 @@ The source is Java-based, but the supported prebuilt release is Windows. Music s
 - Install or repair the official RuneLite launcher.
 - Confirm Java 11+ is available if you are not using RuneLite's JRE.
 - Keep `LumBridge.exe` beside its `app` folder.
-- If automatic setup failed, download the matching `LumBridge-Windows-<arch>-<version>.zip` from the same HapticScape release and extract it manually.
+- If application downloads fail, use **Retry installation** in the launcher.
 
 ### HapticScape shows no gameplay activity
 
@@ -739,20 +709,21 @@ Get-Content .\runelite-bridge-client\RUNTIME.properties
 Get-Content .\build\bridge-windows-package\LumBridge\app\release.json
 ```
 
-The packager rejects a missing or different tag, a dirty checkout, and a RuneLite version override for release builds. A push of the version tag also runs the Windows CI job against that tag; its `hapticscape-windows-packages-<commit>` artifact contains all four versioned release files. Confirm `runeLiteVersion` in LumBridge's `app/release.json` inside the ZIP, then upload the ZIPs and their checksums from that CI artifact (or a verified local tag build). Use a new patch version when correcting an already published release so existing installations receive the update.
+The packager rejects a missing or different tag, a dirty checkout, and a RuneLite version override for release builds. A push of the version tag also runs the Windows CI job against that tag; its `hapticscape-windows-packages-<commit>` artifact contains the launcher installer, internal suite payload, checksums and suite descriptor. Confirm `runeLiteVersion` in LumBridge's `app/release.json` inside the ZIP, then upload the installer, internal payload, descriptor and checksums from that CI artifact (or a verified local tag build). Use a new patch version when correcting an already published release so existing installations receive the update.
 
 The output is written under `build\distribution`:
 
 ```text
+HapticScape-Launcher-Windows-x64-X.Y.Z.exe
+HapticScape-Launcher-Windows-x64-X.Y.Z.exe.sha256
 HapticScape-Windows-x64-X.Y.Z.zip
 HapticScape-Windows-x64-X.Y.Z.zip.sha256
-LumBridge-Windows-x64-X.Y.Z.zip
-LumBridge-Windows-x64-X.Y.Z.zip.sha256
+HapticScape-Suite-X.Y.Z.json
 ```
 
 The desktop packager runs tests, builds the standalone JAR, creates a trimmed Java runtime, compiles `HapticScape.exe` and the updater, collects licenses, and creates the ZIP and checksum.
 
-The LumBridge packager runs bridge tests, verifies the packaged RuneLite client, compiles `LumBridge.exe`, records bridge provenance, collects licenses, and creates a separate ZIP and checksum.
+The LumBridge packager builds the companion app. Unified packaging includes it in the internal suite payload and removes the separate LumBridge ZIP. Users download only the launcher EXE; the full suite ZIP and descriptor remain release assets for automatic downloads and older updater compatibility.
 
 Test the packaged executables before publishing:
 
@@ -761,7 +732,7 @@ build\windows-package\HapticScape\HapticScape.exe
 build\bridge-windows-package\LumBridge\LumBridge.exe
 ```
 
-For an updater-compatible release, keep the Git tag, embedded HapticScape version, HapticScape ZIP version, LumBridge ZIP version, and checksum filenames on the same version.
+For an updater-compatible release, keep the Git tag, embedded HapticScape version, HapticScape ZIP version, LumBridge embedded version, and checksum filenames on the same version.
 
 ## Run two local HapticScape clients
 

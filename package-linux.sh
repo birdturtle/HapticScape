@@ -43,17 +43,28 @@ chmod +x "$suite/install.sh" "$suite/launcher/hapticscape-launcher"
 archive="$root/build/distribution/HapticScape-Linux-$arch-$version.tar.gz"
 tar -C "$stage" -czf "$archive" HapticScape
 (cd build/distribution && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+# Human-facing installers contain the launcher only; the full archive remains
+# the verified payload fetched by the launcher and its updater.
+bootstrap="$stage/bootstrap/HapticScape"
+mkdir -p "$bootstrap/app" "$bootstrap/licenses"
+cp -a "$suite/launcher" "$bootstrap/"
+cp "$suite/app/release.json" "$suite/app/suite.json" "$bootstrap/app/"
+cp "$suite/icon.png" "$suite/install.sh" "$suite/README-LINUX.md" "$suite/VERSION" "$bootstrap/"
+cp "$suite/licenses/LICENSE" "$suite/licenses/launcher-assets.md" "$bootstrap/licenses/"
+printf '{"schemaVersion":1,"version":"%s"}\n' "$version" > "$bootstrap/app/bootstrap.json"
+bootstrap_archive="$stage/launcher.tar.gz"
+tar -C "$stage/bootstrap" -czf "$bootstrap_archive" HapticScape
 installer="$root/build/distribution/HapticScape-Linux-$arch-$version.run"
-payload_hash=$(sha256sum "$archive" | cut -d ' ' -f1)
+payload_hash=$(sha256sum "$bootstrap_archive" | cut -d ' ' -f1)
 sed "s/__PAYLOAD_SHA256__/$payload_hash/" packaging/linux/self-extract.sh > "$installer"
-cat "$archive" >> "$installer"
+cat "$bootstrap_archive" >> "$installer"
 chmod +x "$installer"
 (cd build/distribution && sha256sum "$(basename "$installer")" > "$(basename "$installer").sha256")
 if command -v dpkg-deb >/dev/null; then
     deb_version=$(printf '%s' "$version" | sed 's/-/~/')
     deb="$stage/deb"
     mkdir -p "$deb/DEBIAN" "$deb/opt/hapticscape" "$deb/usr/bin" "$deb/usr/share/applications" "$deb/usr/share/icons/hicolor/256x256/apps"
-    cp -a "$suite/." "$deb/opt/hapticscape/"
+    cp -a "$bootstrap/." "$deb/opt/hapticscape/"
     ln -s /opt/hapticscape/launcher/hapticscape-launcher "$deb/usr/bin/hapticscape-launcher"
     cp "$suite/icon.png" "$deb/usr/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.suite.png"
     cat > "$deb/usr/share/applications/com.hapticscape.launcher.desktop" <<DESKTOP
@@ -74,7 +85,7 @@ Architecture: $deb_arch
 Maintainer: birdturtle <321293670+birdturtle@users.noreply.github.com>
 Depends: libayatana-appindicator3-1 | libappindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0, libsecret-1-0, libx11-6, libxext6, libxi6, libxrender1, libxtst6, libfontconfig1, libasound2 | libasound2t64
 Recommends: pipewire-bin, gnome-keyring | kwalletmanager
-Description: HapticScape launcher with bundled HapticScape, LumBridge and Java
+Description: HapticScape launcher with managed app and Java downloads
 CONTROL
     dpkg-deb --root-owner-group --build "$deb" "$root/build/distribution/hapticscape-launcher_${deb_version}_${deb_arch}.deb"
     (cd build/distribution && sha256sum "hapticscape-launcher_${deb_version}_${deb_arch}.deb" > "hapticscape-launcher_${deb_version}_${deb_arch}.deb.sha256")

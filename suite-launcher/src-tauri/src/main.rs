@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod accounts;
 mod auth;
+mod components;
 mod deep_links;
 mod migration;
 mod processes;
@@ -24,6 +25,7 @@ use std::{
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 struct AppState {
+    components: components::State,
     settings: Mutex<Settings>,
     processes: Mutex<Processes>,
     account: Mutex<AccountState>,
@@ -55,6 +57,9 @@ struct Status {
     updating: bool,
     update_message: String,
     deep_link_message: String,
+    components_needed: bool,
+    components_installing: bool,
+    component_message: String,
 }
 
 #[derive(Serialize)]
@@ -90,6 +95,12 @@ fn port_busy() -> bool {
 fn launcher_ready(window: WebviewWindow) -> Result<(), String> {
     local(&window)?;
     migration::acknowledge()
+}
+
+#[tauri::command]
+async fn install_components(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    local(&window)?;
+    components::install(app).await
 }
 
 #[tauri::command]
@@ -135,6 +146,10 @@ async fn launcher_status(
         needs_sign_in: account.book.current().is_some_and(|s| s.needs_sign_in),
         account_message: account.message.clone(),
         deep_link_message: state.deep_link_message.lock().unwrap().clone(),
+        components_needed: state.components.needed(),
+        components_installing: state.components.root.is_some()
+            && state.updating.load(Ordering::SeqCst),
+        component_message: state.components.message.lock().unwrap().clone(),
         settings,
         platform: std::env::consts::OS,
         installed_version: app.package_info().version.to_string(),
@@ -760,6 +775,8 @@ fn main() {
             let installed = std::env::current_exe()
                 .ok()
                 .and_then(|p| Settings::installed_root(&p));
+            let components = components::State::discover(app.handle(), installed.as_deref())?;
+            let effective_root = components.root.as_ref().or(installed.as_ref());
             let settings = config(app.handle())
                 .ok()
                 .and_then(|path| fs::read(path).ok())
@@ -767,17 +784,31 @@ fn main() {
                 .filter(|s| s.validate().is_ok())
                 .map(|mut settings| {
                     if let Some(root) = &installed {
-                        settings.rebase_managed_paths(root);
+                        if settings.managed_components
+                            || (components.root.is_some() && components::bundled_paths(&settings))
+                        {
+                            components::use_managed_paths(
+                                &mut settings,
+                                effective_root.unwrap(),
+                                components.root.is_some(),
+                            );
+                        } else {
+                            settings.rebase_managed_paths(root);
+                        }
                     }
                     settings
                 })
                 .unwrap_or_else(|| {
-                    installed
-                        .as_ref()
-                        .map(|p| Settings::for_install(p))
+                    effective_root
+                        .map(|p| {
+                            let mut s = Settings::for_install(p);
+                            s.managed_components = components.root.is_some();
+                            s
+                        })
                         .unwrap_or_default()
                 });
             app.manage(AppState {
+                components,
                 settings: Mutex::new(settings),
                 processes: Mutex::new(Processes::default()),
                 account: Mutex::new(AccountState::default()),
@@ -811,6 +842,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             launcher_status,
             launcher_ready,
+            install_components,
             save_settings,
             save_preferences,
             launch_app,

@@ -5,7 +5,11 @@ data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
 install_root="$data_home/hapticscape"
 version=$(cat "$source_root/VERSION")
 [[ $version =~ ^[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$ ]] || { echo 'Invalid package version.' >&2; exit 1; }
-for component in launcher/hapticscape-launcher app/hapticscape-desktop.jar LumBridge/app/lumbridge.jar runtime/bin/java; do
+components=(launcher/hapticscape-launcher app/hapticscape-desktop.jar LumBridge/app/lumbridge.jar runtime/bin/java)
+if [[ -f "$source_root/app/bootstrap.json" ]]; then
+    components=(launcher/hapticscape-launcher app/bootstrap.json app/release.json app/suite.json icon.png)
+fi
+for component in "${components[@]}"; do
     [[ -f "$source_root/$component" ]] || { echo "Missing component: $component" >&2; exit 1; }
 done
 # Give a useful error before changing the user's installation.

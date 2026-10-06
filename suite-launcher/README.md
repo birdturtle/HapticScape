@@ -3,7 +3,7 @@
 Tauri 2 front door for HapticScape and LumBridge. This development prototype
 includes a native desktop UI, configurable component paths, separate Java child
 processes, immutable launch copies, and an experimental Jagex account flow.
-Packaged builds include both apps and Java, with verified suite updates and rollback.
+Public installers contain only the launcher. First launch downloads the matching release’s HapticScape, LumBridge and Java payload, verifies its checksum and runtime, and activates it in a versioned user data directory. Failed downloads can be retried. Full suite archives remain internal release assets for downloads, updates and older updater compatibility.
 
 ## Develop
 
@@ -50,10 +50,7 @@ plaintext or replacing an unreadable account list. The previous single-account
 envelope migrates automatically. Removing an account does not terminate a running
 game or claim remote revocation. Existing credential files are untouched.
 
-Current limits: no automatic token refresh or remote revocation and no process
-adoption after launcher restart. An expired game session needs reauthentication;
-its account entry remains until explicitly removed. Windows launch and account
-tests remain required.
+Saved accounts renew before Play. If Jagex requires interaction, the existing account can be signed in again. Remote revocation and process adoption after launcher restart are not implemented. Windows live account tests remain required.
 
 See [the full design](../docs/unified-launcher-design.md) for the delivery plan.
 

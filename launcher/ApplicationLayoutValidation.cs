@@ -15,7 +15,10 @@ internal static class ApplicationLayoutValidation
 		bool standaloneLayout = File.Exists(desktopJar) && File.Exists(bundledJava);
 		return File.Exists(launcher)
 			&& File.Exists(manifest)
-			&& (legacyLayout || standaloneLayout);
+			&& (legacyLayout || standaloneLayout || (File.Exists(Path.Combine(directory, "app", "bootstrap.json"))
+                && File.Exists(Path.Combine(directory, "app", "suite.json"))
+                && File.Exists(Path.Combine(directory, "launcher", "HapticScapeLauncher.exe"))
+                && File.Exists(Path.Combine(directory, "launcher", "MicrosoftEdgeWebview2Setup.exe"))));
 	}
 
 	internal static bool IsValidStagedApplication(string directory)

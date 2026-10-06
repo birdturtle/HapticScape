@@ -15,6 +15,8 @@ pub struct Settings {
     pub profile: String,
     #[serde(default)]
     pub preferences: Preferences,
+    #[serde(default)]
+    pub managed_components: bool,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug, PartialEq)]
@@ -52,6 +54,7 @@ impl Default for Settings {
                 .unwrap_or_else(|| "java".into()),
             profile: "launcher".into(),
             preferences: Preferences::default(),
+            managed_components: false,
         }
     }
 }
@@ -78,6 +81,7 @@ impl Settings {
             // No named profile means the existing application's normal data directory.
             profile: String::new(),
             preferences: Preferences::default(),
+            managed_components: false,
         }
     }
     pub fn rebase_managed_paths(&mut self, root: &Path) {

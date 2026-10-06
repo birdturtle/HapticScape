@@ -6,6 +6,7 @@ use std::{
     io::{Read, Write},
     path::{Component, Path, PathBuf},
     process::Command,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -132,6 +133,31 @@ pub async fn latest(http: &reqwest::Client, beta: bool) -> Result<GitHubRelease,
     .json()
     .await
     .map_err(|_| "GitHub returned invalid release information.".into())
+}
+pub async fn by_tag(http: &reqwest::Client, tag: &str) -> Result<GitHubRelease, String> {
+    version(tag)?;
+    let response = http
+        .get(format!(
+            "https://api.github.com/repos/{REPOSITORY}/releases/tags/{tag}"
+        ))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "HapticScape-Launcher")
+        .send()
+        .await
+        .map_err(|_| "Cannot reach GitHub. Check your connection and try again.")?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err("This launcher release is not available yet. Try again later.".into());
+    }
+    let release: GitHubRelease = response
+        .error_for_status()
+        .map_err(|_| "GitHub could not return application downloads.")?
+        .json()
+        .await
+        .map_err(|_| "GitHub returned invalid release information.")?;
+    if release.draft || release.tag_name != tag {
+        return Err("The application release does not match this launcher.".into());
+    }
+    Ok(release)
 }
 pub fn describe(
     release: GitHubRelease,
@@ -463,6 +489,7 @@ async fn download(
     asset: &Asset,
     target: &Path,
     limit: u64,
+    progress: Option<&Progress>,
 ) -> Result<(), String> {
     let mut response = http
         .get(&asset.browser_download_url)
@@ -474,6 +501,7 @@ async fn download(
     if response.content_length().unwrap_or(0) > limit {
         return Err("Update download is too large.".into());
     }
+    let length = response.content_length();
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -491,11 +519,29 @@ async fn download(
         }
         file.write_all(&chunk)
             .map_err(|_| "Cannot save update download.")?;
+        if let Some(progress) = progress {
+            let message = match length.filter(|n| *n > 0) {
+                Some(length) => format!(
+                    "Downloading apps and Java… {}%",
+                    (total * 100 / length).min(100)
+                ),
+                None => format!("Downloading apps and Java… {} MB", total / (1024 * 1024)),
+            };
+            progress(&message);
+        }
     }
     file.sync_all()
         .map_err(|_| "Cannot finish update download.".into())
 }
+pub type Progress = Arc<dyn Fn(&str) + Send + Sync>;
 pub async fn stage(release: &GitHubRelease, install: &Path) -> Result<PathBuf, String> {
+    stage_with_progress(release, install, Arc::new(|_| {})).await
+}
+pub async fn stage_with_progress(
+    release: &GitHubRelease,
+    install: &Path,
+    progress: Progress,
+) -> Result<PathBuf, String> {
     let name = asset_name(
         &release.tag_name,
         std::env::consts::OS,
@@ -543,13 +589,28 @@ pub async fn stage(release: &GitHubRelease, install: &Path) -> Result<PathBuf, S
             }))
             .build()
             .map_err(|_| "Cannot prepare update download.")?;
-        download(&http, manifest_asset, &temporary.join("suite.json"), 4096).await?;
+        download(
+            &http,
+            manifest_asset,
+            &temporary.join("suite.json"),
+            4096,
+            None,
+        )
+        .await?;
         manifest(
             &fs::read(temporary.join("suite.json")).map_err(|_| "Cannot read suite manifest.")?,
             &release.tag_name,
         )?;
-        download(&http, hash_asset, &temporary.join("checksum"), 4096).await?;
-        download(&http, package, &temporary.join("package"), MAX_DOWNLOAD).await?;
+        download(&http, hash_asset, &temporary.join("checksum"), 4096, None).await?;
+        download(
+            &http,
+            package,
+            &temporary.join("package"),
+            MAX_DOWNLOAD,
+            Some(&progress),
+        )
+        .await?;
+        progress("Checking files…");
         let temporary_copy = temporary.clone();
         let tag = release.tag_name.clone();
         tauri::async_runtime::spawn_blocking(move || {

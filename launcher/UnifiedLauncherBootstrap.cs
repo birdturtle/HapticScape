@@ -24,6 +24,7 @@ internal static class UnifiedLauncherBootstrap
             }
             if (!legacy) { RegisterProtocol(root); WebViewRuntime.EnsureInstalled(root); }
             string target = legacy ? Path.Combine(root, "HapticScapeLegacy.exe") : Path.Combine(root, "launcher", "HapticScapeLauncher.exe");
+            if (!File.Exists(target)) throw new IOException("Open the launcher first to install HapticScape.");
             ProcessStartInfo info = new ProcessStartInfo(target);
             info.WorkingDirectory = root;
             info.UseShellExecute = false;

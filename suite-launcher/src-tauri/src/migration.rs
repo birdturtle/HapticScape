@@ -40,9 +40,10 @@ pub fn acknowledge() -> Result<(), String> {
     let root =
         Settings::installed_root(&executable).ok_or("Cannot locate the updated installation.")?;
     let settings = Settings::for_install(&root);
-    if !PathBuf::from(&settings.hapticscape_jar).is_file()
-        || !PathBuf::from(&settings.lumbridge_jar).is_file()
-        || !PathBuf::from(&settings.java_path).is_file()
+    if !crate::components::is_bootstrap(&root)
+        && (!PathBuf::from(&settings.hapticscape_jar).is_file()
+            || !PathBuf::from(&settings.lumbridge_jar).is_file()
+            || !PathBuf::from(&settings.java_path).is_file())
     {
         return Err("The updated installation is missing a required component.".into());
     }
