@@ -307,3 +307,50 @@ previously let RuneLite's main thread fail while preload threads kept its JVM
 alive. The LumBridge bootstrap now validates the runtime before startup and exits
 with status 1 on fatal startup errors, so process status cannot remain running
 solely because those preload threads survived the main-thread exception.
+
+## Launcher-driven suite updates
+
+The local Updates page compares semantic versions and offers **Install update and
+restart** only for a newer stable release with the matching OS/architecture package,
+checksum and `HapticScape-Suite-VERSION.json` descriptor. Release publishers must
+attach that descriptor alongside the existing Windows ZIP/LumBridge ZIP/checksums
+and the Linux `.tar.gz`/checksum (the `.run`/`.deb` remain installation downloads).
+Both packagers now generate the descriptor. Existing releases without it are shown
+but cannot be installed as suite updates. No release is published automatically.
+
+The backend re-fetches the release before installation, checks exact repository/tag
+asset URLs, streams bounded downloads, verifies SHA-256, rejects unsafe archive
+paths/links and expansion limits, checks the staged suite version and required
+components, and runs LumBridge's runtime probe before handing off. Hashes protect
+integrity using the HTTPS GitHub release as the trust source; this is not a signed
+update feed. Downloads and verification leave the installed version unchanged.
+
+Installation is blocked while managed apps, the gameplay listener or matching
+external Java clients are running, including clients left alive by a prior launcher.
+A second check occurs after downloading. Other launcher actions cannot start apps
+while an update is in progress. Installation resumes when the user closes the apps
+and clicks the update button again; there is no queued unattended installation.
+
+Windows uses the staged migration helper and retains its startup-confirmation and
+rollback transaction. Its initial directory move retries briefly while the historical
+compatibility bootstrap finishes exiting. Per-user Linux installations copy the
+launcher into staging as a detached helper, wait for the old launcher to exit,
+validate again, move the new suite into a unique release directory and atomically
+switch the current link. The new frontend must acknowledge startup within 90 seconds;
+failure restores the previous link and reopens the previous launcher. Existing Linux
+release directories and user data remain untouched. Package-manager installations
+(e.g. the `.deb` under /opt) show that updates belong in the system package manager
+and cannot be replaced through the per-user updater.
+
+Coverage includes version/asset selection, trusted repository URLs, manifest mismatch,
+archive traversal/link rejection, controlled Linux activation/rollback, real Windows
+migration transactions, extraction/runtime checks on both actual platform archives,
+and a Linux Xvfb test of the packaged helper starting the real updated launcher then
+rolling back a deliberately broken one. Live download/restart acceptance still needs
+a published compatible release. The download progress currently shows its phase,
+not a byte-level progress bar; app data and account sessions survive restarts.
+
+Saved preferences also contain component paths. On a versioned installation,
+startup now rebases bundled paths to the active release while preserving external
+JAR/Java overrides, the profile and preferences. This prevents a preference save
+from pinning Java/apps to an older retained payload after the launcher updates.

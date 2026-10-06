@@ -13,6 +13,7 @@ fn main() {
             "load_accounts",
             "select_account",
             "check_updates",
+            "install_update",
         ]))
         .windows_attributes(
             tauri_build::WindowsAttributes::new().window_icon_path("icons/icon.ico"),

@@ -27,8 +27,9 @@ HapticScape profiles, pairing and settings remain in their normal data location.
 To upgrade the per-user archive installation, run the newer archive's
 `install.sh` again. The application menu switches to the new version; already
 running apps are allowed to finish. Previous installed versions are retained
-under `~/.local/share/hapticscape/releases` for recovery. Updates in the
-launcher currently check for releases; they do not install them automatically.
+under `~/.local/share/hapticscape/releases` for recovery. The launcher can install newer compatible suite releases from the Updates page.
+Close both apps first; the launcher restarts after verification. The system
+package manager handles updates for the `.deb` installation.
 
 To uninstall the archive installation, remove `~/.local/share/hapticscape`,
 `~/.local/share/applications/com.hapticscape.launcher.desktop`, and

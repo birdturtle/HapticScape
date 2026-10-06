@@ -79,6 +79,50 @@ impl Settings {
             preferences: Preferences::default(),
         }
     }
+    pub fn rebase_managed_paths(&mut self, root: &Path) {
+        // Per-user Linux updates change the release directory. Saved preferences
+        // also contain paths; those managed paths must follow the active version.
+        if root
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|p| p.to_str())
+            != Some("releases")
+        {
+            return;
+        }
+        let bundled = Self::for_install(root);
+        for (value, replacement, suffix, levels) in [
+            (
+                &mut self.hapticscape_jar,
+                bundled.hapticscape_jar,
+                "app/hapticscape-desktop.jar",
+                2,
+            ),
+            (
+                &mut self.lumbridge_jar,
+                bundled.lumbridge_jar,
+                "LumBridge/app/lumbridge.jar",
+                3,
+            ),
+            (
+                &mut self.java_path,
+                bundled.java_path,
+                if cfg!(windows) {
+                    "runtime/bin/javaw.exe"
+                } else {
+                    "runtime/bin/java"
+                },
+                3,
+            ),
+        ] {
+            let old_path = Path::new(value);
+            if let Some(old_root) = old_path.ancestors().nth(levels) {
+                if old_root.parent() == root.parent() && old_root.join(suffix) == old_path {
+                    *value = replacement;
+                }
+            }
+        }
+    }
     pub fn installed_root(executable: &Path) -> Option<PathBuf> {
         let parent = executable.parent()?;
         [Some(parent), parent.parent()]
@@ -234,5 +278,29 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(fs::read(first).unwrap(), b"PKfirst");
         fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn saved_preferences_follow_the_active_release_and_keep_external_overrides() {
+        let parent = std::env::temp_dir().join("hapticscape-rebase/releases");
+        let old = parent.join("1.0.0.old");
+        let new = parent.join("1.1.0.new");
+        let mut settings = Settings::for_install(&old);
+        settings.profile = "custom".into();
+        settings.preferences.minimize_on_play = true;
+        settings.rebase_managed_paths(&new);
+        assert_eq!(
+            settings.hapticscape_jar,
+            Settings::for_install(&new).hapticscape_jar
+        );
+        assert_eq!(
+            settings.lumbridge_jar,
+            Settings::for_install(&new).lumbridge_jar
+        );
+        assert_eq!(settings.java_path, Settings::for_install(&new).java_path);
+        assert_eq!(settings.profile, "custom");
+        assert!(settings.preferences.minimize_on_play);
+        settings.hapticscape_jar = "/custom/client.jar".into();
+        settings.rebase_managed_paths(&old);
+        assert_eq!(settings.hapticscape_jar, "/custom/client.jar");
     }
 }

@@ -106,11 +106,22 @@ jobs:
           }
           .\package-all.ps1 -Version $version -UnifiedLauncher
 
+      - name: Verify Windows update archive
+        shell: pwsh
+        run: |
+          $suite = Get-ChildItem build/distribution/HapticScape-Suite-*.json | Select-Object -First 1
+          $env:HAPTICSCAPE_UPDATE_VERSION = (Get-Content $suite.FullName | ConvertFrom-Json).version
+          $env:HAPTICSCAPE_UPDATE_ARCHIVE = (Get-ChildItem build/distribution/HapticScape-Windows-*.zip | Select-Object -First 1).FullName
+          cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
+          if ($LASTEXITCODE -ne 0) { throw 'Windows update archive verification failed.' }
+
       - name: Upload Windows package candidates
         uses: actions/upload-artifact@v4
         with:
           name: hapticscape-windows-packages-${{ github.sha }}
-          path: build/distribution/*.zip*
+          path: |
+            build/distribution/*.zip*
+            build/distribution/HapticScape-Suite-*.json
           retention-days: 7
 
   package-linux:
@@ -142,13 +153,21 @@ jobs:
           version=0.0.0-ci
           if [ "$RELEASE_REF_TYPE" = tag ]; then version="${RELEASE_REF_NAME#v}"; fi
           bash package-linux.sh "$version"
+      - name: Verify Linux update archive
+        run: |
+          export HAPTICSCAPE_UPDATE_VERSION=$(python3 -c 'import glob,json; print(json.load(open(glob.glob("build/distribution/HapticScape-Suite-*.json")[0]))["version"])')
+          export HAPTICSCAPE_UPDATE_ARCHIVE=$(realpath build/distribution/HapticScape-Linux-x64-*.tar.gz)
+          cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
       - name: Test installed Linux package startup
         run: python3 packaging/linux/test-package.py build/distribution/HapticScape-Linux-x64-*.run
+      - name: Test packaged Linux update and rollback
+        run: python3 packaging/linux/test-update.py build/distribution/HapticScape-Linux-x64-*.run
       - name: Upload Linux package candidates
         uses: actions/upload-artifact@v4
         with:
           name: hapticscape-linux-packages-${{ github.sha }}
           path: |
+            build/distribution/HapticScape-Suite-*.json
             build/distribution/*.run*
             build/distribution/*.tar.gz*
             build/distribution/*.deb*

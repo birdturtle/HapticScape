@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 
 internal static class HapticScapeUpdater
@@ -51,7 +52,9 @@ internal static class HapticScapeUpdater
 				parentDirectory,
 				"HapticScape-backup-" + Guid.NewGuid().ToString("N"));
 
-			Directory.Move(installDirectory, backupDirectory);
+			// A compatibility bootstrap may still be finishing its WaitForExit
+            // after the native launcher exits. Give its executable lock time to clear.
+            MoveInstallation(installDirectory, backupDirectory);
 			backupCreated = true;
 			Directory.Move(stagedDirectory, installDirectory);
 			newVersionInstalled = true;
@@ -97,6 +100,16 @@ internal static class HapticScapeUpdater
 			return 1;
 		}
 	}
+
+    private static void MoveInstallation(string source, string target)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        while (true)
+        {
+            try { Directory.Move(source, target); return; }
+            catch (IOException) { if (timer.ElapsedMilliseconds >= 5000) throw; Thread.Sleep(100); }
+        }
+    }
 
 	private static Dictionary<string, string> ParseOptions(string[] args)
 	{

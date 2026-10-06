@@ -48,4 +48,5 @@ Remove-Item $zip -Force
 Compress-Archive -Path $package -DestinationPath $zip -CompressionLevel Optimal
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($zip))" | Set-Content "$zip.sha256" -Encoding ASCII
+@{ schemaVersion = 1; version = $Version } | ConvertTo-Json | Set-Content (Join-Path $root "build\distribution\HapticScape-Suite-$Version.json") -Encoding UTF8
 Write-Host "Unified launcher compatibility package: $zip"

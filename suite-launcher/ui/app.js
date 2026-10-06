@@ -1,6 +1,7 @@
 const invoke = window.__TAURI__?.core.invoke;
 let status;
 let busy = false;
+let updateRelease;
 let toastTimer;
 const $ = (id) => document.getElementById(id);
 
@@ -31,13 +32,15 @@ async function action(command, args = {}) {
     else if (command === 'save_preferences') toast('Preferences saved.');
     await refresh();
     return result;
-  } catch (error) { toast(error, true); }
+  } catch (error) { toast(error, true); if (command === 'install_update') $('update-message').textContent = String(error); }
   finally { busy = false; render(); }
 }
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
   if (!status) return;
+  $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
+  if (status.updateMessage && !busy && !updateRelease) $('update-message').textContent = status.updateMessage;
   $('platform').textContent = status.platform === 'linux' ? 'Linux' : 'Windows';
   for (const [kind, id] of [['hapticscape', 'haptic-status'], ['lumbridge', 'lumbridge-status']]) {
     const running = status[`${kind}Running`], installed = status[`${kind}Installed`];
@@ -128,10 +131,18 @@ async function checkUpdates() {
   const release = await action('check_updates');
   if (!release) return;
   $('release-name').textContent = release.name || release.tag; $('release-name').hidden = false;
-  $('release-summary').textContent = `Latest published release: ${release.tag}${release.publishedAt ? ` · ${new Date(release.publishedAt).toLocaleDateString()}` : ''}`;
+  updateRelease = release;
+  $('install-update').hidden = !release.installable;
+  $('update-message').textContent = release.message || '';
+  $('release-summary').textContent = `Installed: ${release.installedVersion || status.installedVersion || ''} · Latest published release: ${release.tag}${release.publishedAt ? ` · ${new Date(release.publishedAt).toLocaleDateString()}` : ''}`;
   $('release-notes').textContent = release.notes || 'No release notes were provided.'; $('release-notes').hidden = false;
 }
 $('check-updates').addEventListener('click', checkUpdates);
+$('install-update').addEventListener('click', async () => {
+  if (!updateRelease?.installable) return;
+  $('update-message').textContent = 'Downloading and verifying the update…';
+  await action('install_update', { tag: updateRelease.tag });
+});
 if (!invoke) {
   $('haptic-status').textContent = 'Desktop connection unavailable'; $('lumbridge-status').textContent = 'Desktop connection unavailable';
   $('play').disabled = true; $('open-haptic').disabled = true;

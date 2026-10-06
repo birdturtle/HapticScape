@@ -77,4 +77,5 @@ CONTROL
     dpkg-deb --root-owner-group --build "$deb" "$root/build/distribution/hapticscape-launcher_${version/-/~}_${deb_arch}.deb"
     (cd build/distribution && sha256sum "hapticscape-launcher_${version/-/~}_${deb_arch}.deb" > "hapticscape-launcher_${version/-/~}_${deb_arch}.deb.sha256")
 fi
+printf '{"schemaVersion":1,"version":"%s"}\n' "$version" > "$root/build/distribution/HapticScape-Suite-$version.json"
 printf 'Packages created in %s/build/distribution\n' "$root"

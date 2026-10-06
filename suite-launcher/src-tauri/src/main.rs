@@ -4,6 +4,7 @@ mod auth;
 mod migration;
 mod processes;
 mod storage;
+mod updates;
 
 use auth::{AccountState, Callback, Phase};
 use processes::{Preferences, Processes, Settings};
@@ -12,7 +13,10 @@ use std::{
     fs,
     net::TcpListener,
     path::PathBuf,
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -24,6 +28,7 @@ struct AppState {
     wallet: Mutex<()>,
     launches: Mutex<()>,
     http: reqwest::Client,
+    updating: AtomicBool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +47,9 @@ struct Status {
     signing_in: bool,
     account_message: String,
     platform: &'static str,
+    installed_version: String,
+    updating: bool,
+    update_message: String,
 }
 
 #[derive(Serialize)]
@@ -82,6 +90,7 @@ fn launcher_ready(window: WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 async fn launcher_status(
     window: WebviewWindow,
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<Status, String> {
     local(&window)?;
@@ -121,6 +130,15 @@ async fn launcher_status(
         account_message: account.message.clone(),
         settings,
         platform: std::env::consts::OS,
+        installed_version: app.package_info().version.to_string(),
+        updating: state.updating.load(Ordering::SeqCst),
+        update_message: std::env::current_exe()
+            .ok()
+            .and_then(|p| updates::install_root(&p).ok())
+            .and_then(|p| fs::read(p.join("update-result.json")).ok())
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|value| value["message"].as_str().map(str::to_owned))
+            .unwrap_or_default(),
     })
 }
 
@@ -192,6 +210,7 @@ async fn launch_app(
             .minimize_on_play;
     let result = tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>(); let _launch = state.launches.lock().unwrap();
+        if state.updating.load(Ordering::SeqCst) { return Err("Wait for the update to finish before launching apps.".into()); }
         let settings = state.settings.lock().unwrap().clone(); settings.validate()?;
         let cache = app.path().app_cache_dir().map_err(|_| "Cannot locate the launch cache.".to_string())?;
         let credentials = if mode == "play" {
@@ -534,46 +553,108 @@ async fn select_character(
     .await
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Release {
-    tag: String,
-    name: String,
-    notes: String,
-    published_at: String,
-}
 #[tauri::command]
-async fn check_updates(window: WebviewWindow, app: tauri::AppHandle) -> Result<Release, String> {
+async fn check_updates(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+) -> Result<updates::Release, String> {
     local(&window)?;
-    #[derive(serde::Deserialize)]
-    struct GitHubRelease {
-        tag_name: String,
-        name: Option<String>,
-        body: Option<String>,
-        published_at: Option<String>,
+    let writable = std::env::current_exe()
+        .ok()
+        .and_then(|p| updates::install_root(&p).ok())
+        .is_some();
+    let release = updates::latest(&app.state::<AppState>().http).await?;
+    updates::describe(release, &app.package_info().version.to_string(), writable)
+}
+
+#[tauri::command]
+async fn install_update(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    tag: String,
+) -> Result<(), String> {
+    local(&window)?;
+    let state = app.state::<AppState>();
+    if state.updating.swap(true, Ordering::SeqCst) {
+        return Err("An update is already in progress.".into());
     }
-    let release: GitHubRelease = app
-        .state::<AppState>()
-        .http
-        .get("https://api.github.com/repos/birdturtle/HapticScape/releases/latest")
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .map_err(|_| "Cannot reach GitHub. Installed apps are still available.".to_string())?
-        .error_for_status()
-        .map_err(|_| "GitHub could not return the latest release.".to_string())?
-        .json()
-        .await
-        .map_err(|_| "GitHub returned invalid release information.".to_string())?;
-    Ok(Release {
-        tag: release.tag_name,
-        name: release.name.unwrap_or_default(),
-        notes: release.body.unwrap_or_default(),
-        published_at: release.published_at.unwrap_or_default(),
+    struct Reset<'a>(&'a AtomicBool);
+    impl Drop for Reset<'_> {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+    let _reset = Reset(&state.updating);
+    let install = updates::install_root(
+        &std::env::current_exe().map_err(|_| "Cannot locate the installed launcher.")?,
+    )?;
+    let cache = app
+        .path()
+        .app_cache_dir()
+        .map_err(|_| "Cannot locate the launch cache.")?;
+    let check_app = app.clone();
+    let check_cache = cache.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = check_app.state::<AppState>();
+        let _launch = state.launches.lock().unwrap();
+        let mut children = state.processes.lock().unwrap();
+        if processes::running(&mut children.hapticscape)
+            || processes::running(&mut children.lumbridge)
+            || port_busy()
+            || updates::external_apps(&check_cache)?
+        {
+            return Err(
+                "Close HapticScape and LumBridge before installing the update.".to_string(),
+            );
+        }
+        Ok(())
     })
+    .await
+    .map_err(|_| "Cannot check running applications.".to_string())??;
+    let release = updates::latest(&state.http).await?;
+    if release.tag_name != tag {
+        return Err("The latest release changed. Check for updates again.".into());
+    }
+    if !updates::describe(
+        release.clone(),
+        &app.package_info().version.to_string(),
+        true,
+    )?
+    .installable
+    {
+        return Err("There is no compatible newer suite update.".into());
+    }
+    let staged = updates::stage(&release, &install).await?;
+    let staged_copy = staged.clone();
+    let install_copy = install.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        if port_busy() || updates::external_apps(&cache)? {
+            return Err(
+                "An app started while the update was downloading. Close it and try again.".into(),
+            );
+        }
+        updates::handoff(&staged_copy, &install_copy)
+    })
+    .await
+    .map_err(|_| "Cannot start update installation.".to_string())?;
+    if result.is_err() {
+        if let Some(temporary) = staged.parent().and_then(std::path::Path::parent) {
+            let _ = fs::remove_dir_all(temporary);
+        }
+    }
+    result?;
+    app.exit(0);
+    Ok(())
 }
 
 fn main() {
+    if let Some(result) = updates::helper_mode() {
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     // GTK's Wayland window ID derives from the program name, even when the
     // GtkApplication has its own ID. Match the installed desktop entry.
     #[cfg(target_os = "linux")]
@@ -604,6 +685,12 @@ fn main() {
                 .and_then(|path| fs::read(path).ok())
                 .and_then(|data| serde_json::from_slice::<Settings>(&data).ok())
                 .filter(|s| s.validate().is_ok())
+                .map(|mut settings| {
+                    if let Some(root) = &installed {
+                        settings.rebase_managed_paths(root);
+                    }
+                    settings
+                })
                 .unwrap_or_else(|| {
                     installed
                         .as_ref()
@@ -616,6 +703,7 @@ fn main() {
                 account: Mutex::new(AccountState::default()),
                 wallet: Mutex::new(()),
                 launches: Mutex::new(()),
+                updating: AtomicBool::new(false),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
                     .redirect(reqwest::redirect::Policy::none())
@@ -636,7 +724,8 @@ fn main() {
             select_account,
             remove_account,
             select_character,
-            check_updates
+            check_updates,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("Launcher could not start");
