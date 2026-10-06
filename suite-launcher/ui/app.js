@@ -1,6 +1,7 @@
 const invoke = window.__TAURI__?.core.invoke;
 let status;
 let busy = false;
+let starting = false;
 let updateRelease;
 let checkingUpdates = false;
 let updateFeedback = false;
@@ -26,6 +27,8 @@ async function action(command, args = {}) {
   if (busy) return;
   if (!invoke) { toast('Open the desktop launcher to use this action.', true); return; }
   busy = true;
+  starting = command === 'launch_app' && args.mode === 'play';
+  render();
   document.querySelectorAll('button').forEach((button) => { if (!button.dataset.page && !button.dataset.go) button.disabled = true; });
   try {
     const result = await invoke(command, args);
@@ -42,11 +45,12 @@ async function action(command, args = {}) {
       if (command === 'check_updates') $('release-summary').textContent = 'Update check failed. Try again.';
     }
   }
-  finally { busy = false; render(); }
+  finally { busy = false; starting = false; render(); }
 }
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
+  $('play').textContent = starting ? 'Starting…' : 'Play';
   $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
   if (!status) return;
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
@@ -61,11 +65,13 @@ function render() {
   }
   const character = status.characters.find((item) => item.accountId === status.selectedCharacter);
   $('play-hint').textContent = status.gameplayPortBusy && !status.hapticscapeRunning ? 'Gameplay port is in use. Close the other HapticScape client first.'
-    : status.lumbridgeRunning ? 'LumBridge is running.' : !status.hapticscapeInstalled || !status.lumbridgeInstalled ? 'Set application paths in Settings.' : character ? '' : 'Add an account to play.';
+    : status.lumbridgeRunning ? 'LumBridge is running.' : !status.hapticscapeInstalled || !status.lumbridgeInstalled ? 'Set application paths in Settings.' : character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.';
   $('play').disabled = busy || !status.hapticscapeInstalled || !status.lumbridgeInstalled || !character || status.lumbridgeRunning;
   $('open-haptic').disabled = busy || !status.hapticscapeInstalled || status.hapticscapeRunning;
   $('sign-in').disabled = busy || status.signingIn;
   $('sign-in').textContent = status.signingIn ? 'Waiting for Jagex…' : 'Add account';
+  $('reauthenticate').hidden = !status.needsSignIn;
+  $('reauthenticate').disabled = busy || status.signingIn;
   $('cancel-login').hidden = !status.signingIn;
   $('account-actions').hidden = !status.signedIn;
   $('account-message').textContent = status.accountMessage || '';
@@ -194,3 +200,5 @@ async function initialize() {
   if (status.settings.preferences.checkUpdatesOnStartup) await checkUpdates();
 }
 initialize(); setInterval(refresh, 2000);
+
+$('reauthenticate').addEventListener('click', () => action('begin_login'));

@@ -48,6 +48,7 @@ struct Status {
     selected_character: Option<String>,
     signed_in: bool,
     signing_in: bool,
+    needs_sign_in: bool,
     account_message: String,
     platform: &'static str,
     installed_version: String,
@@ -131,6 +132,7 @@ async fn launcher_status(
         selected_character: account.book.current().and_then(|s| s.selected.clone()),
         signed_in: account.book.current().is_some(),
         signing_in: account.attempt.is_some(),
+        needs_sign_in: account.book.current().is_some_and(|s| s.needs_sign_in),
         account_message: account.message.clone(),
         deep_link_message: state.deep_link_message.lock().unwrap().clone(),
         settings,
@@ -195,6 +197,60 @@ fn save_settings(
     Ok(())
 }
 
+// The wallet lock serializes refresh-token rotation with login, switching and
+// removal. No account/process mutex is held across network requests.
+fn prepare_play(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String> {
+    let state = app.state::<AppState>();
+    let _wallet = state.wallet.lock().unwrap();
+    let mut book = load_book(app)?;
+    let id = book
+        .selected
+        .clone()
+        .ok_or("Sign in and choose a character before playing.")?;
+    let mut session = book
+        .current()
+        .cloned()
+        .ok_or("Sign in and choose a character before playing.")?;
+    if session.needs_sign_in {
+        return Err("Sign in again to continue playing.".into());
+    }
+    let persist = |book: &accounts::AccountBook| -> Result<(), String> {
+        // Retain a rotated token in memory even if disk activation fails. A retry
+        // must save it before launching, rather than use the superseded token.
+        {
+            let mut account = state.account.lock().unwrap();
+            account.book = book.clone();
+            account.loaded = true;
+        }
+        storage::save(&config(app)?.with_file_name("session.enc"), book)
+    };
+    let result = tauri::async_runtime::block_on(auth::ensure_session(
+        &state.http,
+        &mut session,
+        &id,
+        |current| {
+            *book.current_mut().unwrap() = current.clone();
+            persist(&book)
+        },
+    ));
+    if let Err(error) = result {
+        let message = error.message();
+        state.account.lock().unwrap().message = message.clone();
+        return Err(message);
+    }
+    state.account.lock().unwrap().message.clear();
+    let character = session
+        .characters
+        .iter()
+        .find(|c| Some(&c.account_id) == session.selected.as_ref())
+        .ok_or("Choose a character before playing.")?;
+    Ok(vec![
+        ("JX_SESSION_ID".into(), session.session_id.clone()),
+        ("JX_CHARACTER_ID".into(), character.account_id.clone()),
+        ("JX_DISPLAY_NAME".into(), character.display_name.clone()),
+    ])
+}
+
 #[tauri::command]
 async fn launch_app(
     window: WebviewWindow,
@@ -219,11 +275,8 @@ async fn launch_app(
         let settings = state.settings.lock().unwrap().clone(); settings.validate()?;
         let cache = app.path().app_cache_dir().map_err(|_| "Cannot locate the launch cache.".to_string())?;
         let credentials = if mode == "play" {
-            let account = state.account.lock().unwrap();
-            let session = account.book.current().ok_or("Sign in and choose a character before playing.")?;
-            let character = session.characters.iter().find(|c| Some(&c.account_id) == session.selected.as_ref())
-                .ok_or("Choose a character before playing.")?;
-            vec![("JX_SESSION_ID".into(), session.session_id.clone()), ("JX_CHARACTER_ID".into(), character.account_id.clone()), ("JX_DISPLAY_NAME".into(), character.display_name.clone())]
+            if processes::running(&mut state.processes.lock().unwrap().lumbridge) { return Ok("LumBridge is already running.".into()); }
+            prepare_play(&app)?
         } else { Vec::new() };
         let lumbridge = if mode == "play" { Some(processes::snapshot(&PathBuf::from(&settings.lumbridge_jar), &cache)?) } else { None };
         let mut children = state.processes.lock().unwrap();
@@ -286,12 +339,13 @@ async fn handle_callback(app: tauri::AppHandle, callback: Callback) {
                 attempt.nonce.clone(),
                 attempt.subject.clone(),
                 attempt.refresh_token.clone(),
+                attempt.oauth_expires_at,
             ))),
             Ok(false) => Ok(None),
             Err(error) => Err((attempt.state.clone(), error)),
         }
     };
-    let (id, verifier, nonce, subject, refresh) = match work {
+    let (id, verifier, nonce, subject, refresh, oauth_expiry) = match work {
         Ok(Some(work)) => work,
         Ok(None) => return,
         Err((id, error)) => {
@@ -310,6 +364,7 @@ async fn handle_callback(app: tauri::AppHandle, callback: Callback) {
                         return Ok(());
                     };
                     attempt.subject = Some(claims.sub);
+                    attempt.oauth_expires_at = auth::now().saturating_add(tokens.expires_in);
                     attempt.refresh_token = Some(tokens.refresh_token);
                     attempt.phase = Phase::Consent;
                     attempt.consent_url(&tokens.id_token)
@@ -326,12 +381,13 @@ async fn handle_callback(app: tauri::AppHandle, callback: Callback) {
                 {
                     return Err("This identity response does not match your sign-in.".into());
                 }
-                let session = auth::game_session(
+                let mut session = auth::game_session(
                     &state.http,
                     &token,
                     refresh.ok_or("Missing launcher session.")?,
                 )
                 .await?;
+                session.oauth_expires_at = oauth_expiry;
                 let handle = app.clone();
                 let attempt_id = id.clone();
                 tauri::async_runtime::spawn_blocking(move || {

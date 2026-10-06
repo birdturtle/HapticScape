@@ -186,8 +186,7 @@ Eleven Rust unit tests cover callback and login-frame validation, profile valida
 snapshots, and authenticated encryption; frontend tests cover window capabilities
 and content policy.
 
-Current limits: no automatic token refresh or remote
-revocation; bridge readiness uses port availability rather than an identity/status
+At this initial milestone, automatic token refresh and remote revocation were missing; bridge readiness uses port availability rather than an identity/status
 handshake; an unrelated listener is refused and existing external processes are
 not adopted. Release checks do not download or install. Default component paths
 point into the development checkout. Installers, runtime distribution, desktop
@@ -365,8 +364,8 @@ launcher owns suite updates; Windows compatibility and migration helpers remain
 for existing installations. Old updater preference files are left untouched.
 
 The user accepted launcher-driven Linux beta updates. Remaining work includes
-hands-on Windows account/Play and legacy migration acceptance and automatic
-account token refresh. Expired sessions currently require signing in again.
+hands-on Windows account/Play and legacy migration acceptance. Automatic token
+refresh is now implemented as described below; live provider renewal acceptance remains pending.
 The user attributed the apparent Wayland startup failure to an old launcher
 instance still running; it is no longer tracked as an unresolved Wayland issue.
 
@@ -408,3 +407,11 @@ Cold-start arguments and single-instance callbacks use the same validated queue.
 Pending links live in launcher configuration, outside replaceable release directories. Submission markers prevent replay after Java consumes a request; a crash between enqueue and marker creation can deliver once again, so the handoff is at least once and Java's existing join deduplication remains necessary. Unix inboxes are private and records are written atomically. Links expire after five minutes, are never printed, and stay queued while update installation is in progress. Profile changes require restoring the original profile before delivering its queued link.
 
 Automated checks cover strict URI validation, profile inbox paths, private atomic writes, repeated submission and acknowledgement across restart, plus Linux desktop registration. Interactive Discord cold-start/running/tray acceptance and Windows protocol activation still require a packaged build check before publishing a corrected stable release. The existing `v3.2.0` tag is unchanged.
+
+### Automatic account renewal before Play
+
+Play checks the selected account before starting either application. OAuth credentials renew sixty seconds before expiry using Jagex’s refresh grant. Returned refresh tokens are saved immediately in the existing encrypted wallet; verified expiry is then saved separately so a failed signing-key or character request cannot lose a rotated token. Account changes and renewal share the wallet lock. Fresh login responses store their expiry, and existing saved accounts without expiry renew on their next Play.
+
+The game session is independent of OAuth expiry. Its character-list request is checked before launch. A rejected game session triggers a silent consent request (`prompt=none`) using a fresh launcher identity, then creates a new game session from the consent identity. Redirects stay on the configured Jagex account origin, and callbacks require matching state, nonce, audience, issuer, signature and account subject. No login or consent requirement is bypassed: when Jagex requires interaction, the selected account remains saved and a Sign in again action opens the normal browser flow. Provider availability/rate-limit/network errors preserve credentials and offer retry. A missing selected character requires another selection instead of launching a different character.
+
+Mock-provider checks cover refresh rotation and omitted replacement tokens, expiry, old wallet migration, successful silent game-session renewal with signed JWTs, preserved selection, token checkpoints before later failures, explicit invalid-grant rejection, wrong nonce and transient errors. Real Jagex silent renewal and Windows acceptance still need testing; mock success does not establish that Jagex will grant a silent consent request for every saved account.

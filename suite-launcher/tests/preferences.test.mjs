@@ -138,3 +138,18 @@ test('update check shows progress, channel and persistent failure without stale 
   assert.equal(app.element('update-message').textContent, 'Ready to install.');
   assert.equal(app.element('install-update').hidden, false);
 });
+
+test('expired account offers the existing browser sign-in flow and keeps its character visible', async () => {
+  const app = launcher({ checkUpdatesOnStartup: false }, { status: {
+    needsSignIn: true, accounts: [{ id: 'saved', name: 'Character' }], selectedAccount: 'saved',
+    characters: [{ accountId: 'character', displayName: 'Character' }], selectedCharacter: 'character',
+    accountMessage: 'Sign in again to continue playing.',
+  } });
+  await settle();
+  assert.equal(app.element('reauthenticate').hidden, false);
+  assert.equal(app.element('account-message').textContent, 'Sign in again to continue playing.');
+  assert.equal(app.element('characters').children.length, 1);
+  await app.element('reauthenticate').listeners.click();
+  assert.equal(app.calls.some((call) => call.command === 'begin_login'), true);
+  assert.equal(app.calls.some((call) => call.command === 'remove_account'), false);
+});

@@ -111,6 +111,9 @@ mod tests {
                 display_name: character.into(),
             }],
             selected: Some(character.into()),
+            oauth_expires_at: 0,
+            oauth_id_token: None,
+            needs_sign_in: false,
         }
     }
     #[test]
