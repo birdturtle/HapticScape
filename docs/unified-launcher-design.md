@@ -298,3 +298,12 @@ installed path discovery and initial rendering. When present, the `.deb` is
 extracted and checked for both apps, Java, the launcher, desktop entry and declared
 WebKit/libsecret dependencies. This is a startup smoke check, not live Jagex login,
 wallet persistence, game rendering or hardware acceptance.
+
+Bundled Java modules are shared by Linux and Windows packaging through
+`packaging/java-runtime-modules.txt`. LumBridge's `--verify-runtime` entry point
+checks RuneLite's HTTP server, compiler, JShell, attach and desktop APIs using the
+actual bundled runtime before a package is emitted. A missing `jdk.httpserver`
+previously let RuneLite's main thread fail while preload threads kept its JVM
+alive. The LumBridge bootstrap now validates the runtime before startup and exits
+with status 1 on fatal startup errors, so process status cannot remain running
+solely because those preload threads survived the main-thread exception.

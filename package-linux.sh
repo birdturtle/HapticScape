@@ -36,7 +36,9 @@ cp packaging/linux/install.sh packaging/linux/README-LINUX.md "$suite/"
 printf '%s\n' "$version" > "$suite/VERSION"
 printf '{"version":"%s","architecture":"%s","repository":"birdturtle/HapticScape"}\n' "$version" "$arch" > "$suite/app/release.json"
 printf '{"schemaVersion":1,"version":"%s","repository":"birdturtle/HapticScape"}\n' "$version" > "$suite/app/suite.json"
-jlink --add-modules java.se,jdk.crypto.ec,jdk.unsupported,jdk.jsobject,jdk.management,jdk.net --strip-debug --no-header-files --no-man-pages --compress=2 --output "$suite/runtime"
+runtime_modules=$(paste -sd, packaging/java-runtime-modules.txt)
+jlink --add-modules "$runtime_modules" --strip-debug --no-header-files --no-man-pages --compress=2 --output "$suite/runtime"
+"$suite/runtime/bin/java" -jar "$suite/LumBridge/app/lumbridge.jar" --verify-runtime
 chmod +x "$suite/install.sh" "$suite/launcher/hapticscape-launcher"
 archive="$root/build/distribution/HapticScape-Linux-$arch-$version.tar.gz"
 tar -C "$stage" -czf "$archive" HapticScape

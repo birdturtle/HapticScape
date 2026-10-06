@@ -95,20 +95,7 @@ try
 		throw 'A JDK with jlink is required to package HapticScape. Set HAPTICSCAPE_JAVA_HOME to a redistributable JDK 11+ and try again.'
 	}
 
-	$runtimeModules = @(
-		'java.se',
-		'jdk.jsobject',
-		'jdk.management',
-		'jdk.net',
-		'java.base',
-		'java.desktop',
-		'java.logging',
-		'java.management',
-		'java.naming',
-		'java.sql',
-		'jdk.crypto.ec',
-		'jdk.unsupported'
-	)
+	$runtimeModules = @(Get-Content (Join-Path $projectRoot 'packaging\java-runtime-modules.txt') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 	Write-Host 'Creating the bundled HapticScape Java runtime...'
 	& $jlinkPath `
 		'--add-modules' ($runtimeModules -join ',') `

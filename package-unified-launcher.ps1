@@ -31,6 +31,8 @@ $launcher = Join-Path $package 'launcher'
 New-Item -ItemType Directory -Path $launcher -Force | Out-Null
 Copy-Item "$root\suite-launcher\src-tauri\target\release\hapticscape-launcher.exe" "$launcher\HapticScapeLauncher.exe"
 Copy-Item $bridge "$package\LumBridge" -Recurse -Force
+& "$package\runtime\bin\java.exe" -jar "$package\LumBridge\app\lumbridge.jar" --verify-runtime
+if ($LASTEXITCODE -ne 0) { throw 'The bundled Java runtime cannot run LumBridge.' }
 Move-Item "$package\HapticScape.exe" "$package\HapticScapeLegacy.exe" -Force
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 & $csc /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Windows.Forms.dll "/win32icon:$root\hapticscape.ico" "/out:$package\HapticScape.exe" "$root\launcher\UnifiedLauncherBootstrap.cs" "$root\launcher\WebViewRuntime.cs"

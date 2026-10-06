@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
     subprocess.run(['bash', str(installer)], env=env, check=True)
     installed = home / '.local/share/hapticscape/current'
     subprocess.run([str(installed / 'runtime/bin/java'), '-version'], env=env, check=True)
+    subprocess.run([str(installed / 'runtime/bin/java'), '-jar', str(installed / 'LumBridge/app/lumbridge.jar'), '--verify-runtime'], env=env, check=True)
     staging = root / 'HapticScape-update-smoke'
     staging.mkdir()
     marker = staging / 'launcher-ready'
