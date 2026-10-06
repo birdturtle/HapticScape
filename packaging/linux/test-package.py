@@ -4,7 +4,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import tarfile
 import time
 import uuid
 
@@ -44,8 +43,10 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-package-test-') as temporar
     assert not (installed / 'runtime').exists()
     assert not (installed / 'LumBridge').exists()
     payload = root / 'payload'
-    with tarfile.open(str(installer).removesuffix('.run') + '.tar.gz') as archive:
-        archive.extractall(payload, filter='data')
+    payload.mkdir()
+    # Use the same GNU tar semantics as packaging for this locally built fixture;
+    # Java licence links are also validated by the native archive test in CI.
+    subprocess.run(['tar', '-xzf', str(installer).removesuffix('.run') + '.tar.gz', '-C', str(payload)], check=True)
     bundled = payload / 'HapticScape'
     subprocess.run([str(bundled / 'runtime/bin/java'), '-jar', str(bundled / 'LumBridge/app/lumbridge.jar'), '--verify-runtime'], env=env, check=True)
     staging = root / 'HapticScape-update-smoke'

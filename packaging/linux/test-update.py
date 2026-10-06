@@ -6,7 +6,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import tarfile
 import time
 
 if not os.environ.get('HAPTICSCAPE_TEST_DISPLAY'):
@@ -36,8 +35,8 @@ with tempfile.TemporaryDirectory(prefix='hapticscape-update-test-') as temporary
         old = current.resolve()
         stage = install / ('HapticScape-update-failure' if fail else 'HapticScape-update-success')
         staged = stage / 'extracted/HapticScape'
-        with tarfile.open(str(installer).removesuffix('.run') + '.tar.gz') as archive:
-            archive.extractall(stage / 'extracted', filter='data')
+        staged.parent.mkdir(parents=True)
+        subprocess.run(['tar', '-xzf', str(installer).removesuffix('.run') + '.tar.gz', '-C', str(staged.parent)], check=True)
         helper = stage / 'update-helper'
         shutil.copy2(old / 'launcher/hapticscape-launcher', helper)
         if fail:
