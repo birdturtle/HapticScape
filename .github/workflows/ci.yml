@@ -129,7 +129,7 @@ jobs:
           node-version: '22'
       - uses: gradle/actions/setup-gradle@v6
       - name: Install launcher build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsecret-1-dev librsvg2-dev libssl-dev pkg-config patchelf
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsecret-1-dev librsvg2-dev libssl-dev libdbus-1-dev pkg-config patchelf xvfb xauth
       - name: Set up Rust
         run: rustup update stable
       - name: Test per-user installation and upgrade
@@ -142,6 +142,8 @@ jobs:
           version=0.0.0-ci
           if [ "$RELEASE_REF_TYPE" = tag ]; then version="${RELEASE_REF_NAME#v}"; fi
           bash package-linux.sh "$version"
+      - name: Test installed Linux package startup
+        run: python3 packaging/linux/test-package.py build/distribution/HapticScape-Linux-x64-*.run
       - name: Upload Linux package candidates
         uses: actions/upload-artifact@v4
         with:

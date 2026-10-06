@@ -290,3 +290,11 @@ retained for recovery; automatic launcher-driven download/update activation is s
 separate work. Debian installation uses /opt/hapticscape with dependency metadata
 and a desktop entry managed by the package manager. GTK/WebKit and a working Secret
 Service wallet remain system prerequisites; PipeWire tools support music capture.
+
+`packaging/linux/test-package.py` also installs the actual self-extracting bundle
+into an isolated home, executes bundled Java, and opens the installed native
+launcher on Xvfb. It requires the real frontend's startup acknowledgement, covering
+installed path discovery and initial rendering. When present, the `.deb` is
+extracted and checked for both apps, Java, the launcher, desktop entry and declared
+WebKit/libsecret dependencies. This is a startup smoke check, not live Jagex login,
+wallet persistence, game rendering or hardware acceptance.
