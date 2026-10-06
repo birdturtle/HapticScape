@@ -124,3 +124,8 @@ the required native acceptance evidence is available.
   locking/unlocking, cancelled prompts, and actual Discord restoration.
 - Next implementation: Phase 3, PipeWire output capture. Phase 2 KDE acceptance
   can proceed separately before claiming secure-storage support verified.
+- Linux now exports a native StatusNotifierItem and DBusMenu through GIO/JNA,
+  replacing the ineffective AWT/Swing tray attempt. KDE renders Open and Exit;
+  Exit uses the existing protected-exit flow. Closing the window hides it only
+  with a registered tray host. Missing/lost hosts leave or restore the window.
+  See [linux-tray-testing.md](linux-tray-testing.md) for checks and acceptance.

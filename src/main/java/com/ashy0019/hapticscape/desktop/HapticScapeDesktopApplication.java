@@ -139,7 +139,13 @@ public final class HapticScapeDesktopApplication implements AutoCloseable
 			createWindow(settings, skillCatalog, settingsStore, sourceMessages);
 			boolean trayInstalled = desktopNotifications.installApplicationMenu(
 				window::restoreFromTray,
-				window::requestCloseFromTray
+				window::requestCloseFromTray,
+				available ->
+				{
+					if (closed.get()) return;
+					window.setTrayAvailable(available);
+					if (!available) window.restoreFromTray();
+				}
 			);
 			window.setTrayAvailable(trayInstalled);
 			if (!launchOptions.isMinimized() || !trayInstalled)

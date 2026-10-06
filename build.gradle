@@ -280,3 +280,17 @@ tasks.register('verifyLinuxKeyringBindings', JavaExec) {
 		java.nio.file.Files.deleteIfExists(ext.isolatedKeyringDirectory)
 	}
 }
+
+// Tests the real GIO/D-Bus tray protocol without touching the desktop session bus.
+tasks.register('verifyLinuxTray', Exec) {
+	dependsOn tasks.named('testClasses')
+	group = LifecycleBasePlugin.VERIFICATION_GROUP
+	description = 'Checks native StatusNotifierItem and DBusMenu on a disposable session bus.'
+	onlyIf { System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('linux') }
+	doFirst {
+		environment 'G_DEBUG', 'fatal-criticals'
+		commandLine 'dbus-run-session', '--', new File(System.getProperty('java.home'), 'bin/java').absolutePath,
+			'-Djava.awt.headless=true', '-cp', sourceSets.test.runtimeClasspath.asPath,
+			'com.ashy0019.hapticscape.integration.desktop.LinuxTrayNativeSmoke'
+	}
+}
