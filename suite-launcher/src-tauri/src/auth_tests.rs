@@ -60,6 +60,9 @@ fn server(
                     Err(e) => panic!("{e}"),
                 }
             };
+            // Windows accepted sockets inherit the listener's nonblocking mode.
+            // Read complete requests using the timeout on every platform.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
