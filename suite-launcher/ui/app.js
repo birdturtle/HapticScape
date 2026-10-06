@@ -121,8 +121,11 @@ $('open-haptic').addEventListener('click', () => action('launch_app', { mode: 'h
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));
 $('preferences-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const preferences = Object.fromEntries(['minimizeOnPlay', 'checkUpdatesOnStartup'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
+  const preferences = Object.fromEntries(['minimizeOnPlay', 'checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
   await action('save_preferences', { preferences });
+  updateRelease = undefined;
+  $('install-update').hidden = true;
+  $('release-summary').textContent = 'Check for updates to use the saved preferences.';
 });
 $('settings-form').addEventListener('submit', async (event) => {
   event.preventDefault(); await action('save_settings', { settings: { ...status.settings, ...Object.fromEntries(new FormData(event.currentTarget)) } });

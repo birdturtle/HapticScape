@@ -45,7 +45,7 @@ public final class SettingsLockCatalog
 	public static final SettingsLockTarget STARTUP_BEHAVIOR = register(
 		"application.startup",
 		"Application",
-		"Start with Windows"
+		"Start at sign-in"
 	);
 
 	public static final SettingsLockTarget LEVEL_UP_HAPTICS = register(

@@ -20,6 +20,10 @@ pub struct Asset {
 #[derive(Clone, Deserialize)]
 pub struct GitHubRelease {
     pub tag_name: String,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub prerelease: bool,
     pub name: Option<String>,
     pub body: Option<String>,
     pub published_at: Option<String>,
@@ -78,7 +82,43 @@ fn asset<'a>(release: &'a GitHubRelease, name: &str) -> Result<&'a Asset, String
     }
     Ok(found)
 }
-pub async fn latest(http: &reqwest::Client) -> Result<GitHubRelease, String> {
+fn select_release(releases: Vec<GitHubRelease>, beta: bool) -> Result<GitHubRelease, String> {
+    releases
+        .into_iter()
+        .filter(|r| !r.draft && (beta || !r.prerelease))
+        .filter_map(|r| version(&r.tag_name).ok().map(|v| (v, r)))
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, r)| r)
+        .ok_or_else(|| "No published releases are available for this update channel.".into())
+}
+pub async fn latest(http: &reqwest::Client, beta: bool) -> Result<GitHubRelease, String> {
+    if beta {
+        let mut releases = Vec::new();
+        for page in 1..=10 {
+            let batch: Vec<GitHubRelease> = http
+                .get(format!(
+                    "https://api.github.com/repos/{REPOSITORY}/releases?per_page=100&page={page}"
+                ))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "HapticScape-Launcher")
+                .send()
+                .await
+                .map_err(|_| {
+                    "Cannot reach GitHub. Installed apps are still available.".to_string()
+                })?
+                .error_for_status()
+                .map_err(|_| "GitHub could not return releases.".to_string())?
+                .json()
+                .await
+                .map_err(|_| "GitHub returned invalid release information.".to_string())?;
+            let done = batch.len() < 100;
+            releases.extend(batch);
+            if done {
+                return select_release(releases, true);
+            }
+        }
+        return Err("Too many releases to check safely.".into());
+    }
     http.get(format!(
         "https://api.github.com/repos/{REPOSITORY}/releases/latest"
     ))
@@ -772,6 +812,35 @@ pub fn helper_mode() -> Option<Result<(), String>> {
 mod tests {
     use super::*;
     #[test]
+    fn channels_exclude_drafts_and_order_versions() {
+        let releases = || {
+            serde_json::from_str::<Vec<GitHubRelease>>(
+                r#"[
+          {"tag_name":"v3.2.0-beta.2","prerelease":true,"assets":[]},
+          {"tag_name":"v3.1.4","assets":[]},
+          {"tag_name":"v3.2.0-beta.10","prerelease":true,"assets":[]},
+          {"tag_name":"v9.0.0","draft":true,"assets":[]},
+          {"tag_name":"invalid","assets":[]}
+        ]"#,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            select_release(releases(), false).unwrap().tag_name,
+            "v3.1.4"
+        );
+        assert_eq!(
+            select_release(releases(), true).unwrap().tag_name,
+            "v3.2.0-beta.10"
+        );
+        let stable: GitHubRelease =
+            serde_json::from_str(r#"{"tag_name":"v3.2.0","assets":[]}"#).unwrap();
+        let mut promoted = releases();
+        promoted.push(stable);
+        assert_eq!(select_release(promoted, true).unwrap().tag_name, "v3.2.0");
+        assert!(select_release(Vec::new(), true).is_err());
+    }
+    #[test]
     fn versions_and_assets_are_platform_specific_and_reject_injection() {
         assert_eq!(
             asset_name("v3.1.2", "linux", "x86_64").unwrap(),
@@ -826,6 +895,8 @@ mod tests {
         let name = "HapticScape-Linux-x64-3.1.2.tar.gz";
         let mut release = GitHubRelease {
             tag_name: "v3.1.2".into(),
+            draft: false,
+            prerelease: false,
             name: None,
             body: None,
             published_at: None,

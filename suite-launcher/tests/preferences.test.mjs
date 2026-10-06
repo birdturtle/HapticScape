@@ -85,3 +85,16 @@ test('update failures stay visible and incompatible releases hide installation',
   await settle();
   assert.equal(old.element('install-update').hidden, true);
 });
+
+
+test('beta preference persists and invalidates a previously checked update', async () => {
+  const app = launcher({ includeBetaUpdates: false, checkUpdatesOnStartup: true }, { release: { tag: 'v3.2.0', installable: true } });
+  await settle();
+  assert.equal(app.element('install-update').hidden, false);
+  app.element('preferences-form:includeBetaUpdates').checked = true;
+  await app.element('preferences-form').listeners.submit({ preventDefault() {}, currentTarget: app.element('preferences-form') });
+  assert.equal(app.calls.find((call) => call.command === 'save_preferences').args.preferences.includeBetaUpdates, true);
+  assert.equal(app.element('install-update').hidden, true);
+  await app.element('install-update').listeners.click();
+  assert.equal(app.calls.some((call) => call.command === 'install_update'), false);
+});

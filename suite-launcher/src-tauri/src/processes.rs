@@ -22,6 +22,7 @@ pub struct Settings {
 pub struct Preferences {
     pub minimize_on_play: bool,
     pub check_updates_on_startup: bool,
+    pub include_beta_updates: bool,
 }
 
 impl Default for Settings {
@@ -225,6 +226,7 @@ mod tests {
         assert_eq!(settings.hapticscape_jar, "custom/haptic.jar");
         assert_eq!(settings.preferences, Preferences::default());
         settings.preferences.minimize_on_play = true;
+        settings.preferences.include_beta_updates = true;
         let restored: Settings =
             serde_json::from_slice(&serde_json::to_vec(&settings).unwrap()).unwrap();
         assert_eq!(restored.preferences, settings.preferences);

@@ -563,7 +563,14 @@ async fn check_updates(
         .ok()
         .and_then(|p| updates::install_root(&p).ok())
         .is_some();
-    let release = updates::latest(&app.state::<AppState>().http).await?;
+    let state = app.state::<AppState>();
+    let beta = state
+        .settings
+        .lock()
+        .unwrap()
+        .preferences
+        .include_beta_updates;
+    let release = updates::latest(&state.http, beta).await?;
     updates::describe(release, &app.package_info().version.to_string(), writable)
 }
 
@@ -611,7 +618,13 @@ async fn install_update(
     })
     .await
     .map_err(|_| "Cannot check running applications.".to_string())??;
-    let release = updates::latest(&state.http).await?;
+    let beta = state
+        .settings
+        .lock()
+        .unwrap()
+        .preferences
+        .include_beta_updates;
+    let release = updates::latest(&state.http, beta).await?;
     if release.tag_name != tag {
         return Err("The latest release changed. Check for updates again.".into());
     }
