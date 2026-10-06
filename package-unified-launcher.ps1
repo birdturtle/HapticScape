@@ -8,6 +8,7 @@ $root = $PSScriptRoot
 $package = Join-Path $root 'build\windows-package\HapticScape'
 $bridge = Join-Path $root 'build\bridge-windows-package\LumBridge'
 if (!(Test-Path "$package\HapticScape.exe") -or !(Test-Path "$bridge\app\lumbridge.jar")) { throw 'Build both Java packages first with package-all.ps1.' }
+$configPath = Join-Path ([IO.Path]::GetTempPath()) ('hapticscape-tauri-' + [Guid]::NewGuid().ToString('N') + '.json')
 Push-Location (Join-Path $root 'suite-launcher')
 try {
     & npm.cmd ci
@@ -16,10 +17,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Launcher frontend checks failed.' }
     & cargo test --manifest-path src-tauri/Cargo.toml
     if ($LASTEXITCODE -ne 0) { throw 'Launcher native tests failed.' }
+    # cmd.exe wrappers can strip JSON quotes from inline native arguments.
+    # Pass a UTF-8 file so the version reaches Tauri without shell reinterpretation.
     $config = @{ version = $Version } | ConvertTo-Json -Compress
-    & npx.cmd tauri build --no-bundle --config $config
+    [IO.File]::WriteAllText($configPath, $config, [Text.UTF8Encoding]::new($false))
+    & npx.cmd tauri build --no-bundle --config $configPath
     if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed.' }
-} finally { Pop-Location }
+} finally {
+    Pop-Location
+    if (Test-Path $configPath) { Remove-Item $configPath -Force }
+}
 $launcher = Join-Path $package 'launcher'
 New-Item -ItemType Directory -Path $launcher -Force | Out-Null
 Copy-Item "$root\suite-launcher\src-tauri\target\release\hapticscape-launcher.exe" "$launcher\HapticScapeLauncher.exe"
