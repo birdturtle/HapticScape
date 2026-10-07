@@ -6,13 +6,12 @@ installs the desktop dependencies too.
 
 On other distributions, download `HapticScape-Linux-*.run` and run it with
 `bash HapticScape-Linux-x64-VERSION.run` (replace VERSION with the downloaded
-version, and use arm64 on ARM computers). This one file contains the full suite.
+version, and use arm64 on ARM computers). This file installs the launcher.
 
 Alternatively, extract `HapticScape-Linux-*.tar.gz`, open a terminal
 in the extracted `HapticScape` directory, and run `./install.sh`.
 Then open **HapticScape Launcher** from your application menu. This installs
-only for your user and needs no administrator password. Java, HapticScape,
-and LumBridge are included; no JAR paths or Java installation are needed.
+only for your user and needs no administrator password. The full archive includes Java, HapticScape and LumBridge; no JAR paths or Java installation are needed.
 
 The archive needs GTK 3, WebKitGTK 4.1, libsecret, and a running Secret Service
 wallet (KWallet with Secret Service enabled or GNOME Keyring). Music capture
