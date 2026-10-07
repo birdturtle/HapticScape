@@ -54,6 +54,7 @@ function render() {
   $('play').textContent = starting ? 'Starting…' : installingComponents || status?.componentsInstalling ? 'Installing…' : status?.componentsNeeded ? 'Retry installation' : 'Play';
   $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
   if (!status) return;
+  $('installed-version').textContent = status.installedVersion || '';
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
   if (status.updateMessage && !busy && !updateFeedback) $('update-message').textContent = status.updateMessage;
   $('deep-link-message').textContent = status.deepLinkMessage || '';
