@@ -1,15 +1,27 @@
 # HapticScape
 
-HapticScape is a standalone Windows application that turns Old School RuneScape gameplay events, Windows system audio, and approved Remote Play actions into configurable haptic feedback and optional clicker sounds.
+HapticScape is a standalone Windows and Linux application that turns Old School RuneScape gameplay events, system or application audio, and approved Remote Play actions into configurable haptic feedback and optional clicker sounds.
 
 Haptics are sent through [Intiface Central](https://intiface.com/). Gameplay events are received through a small local bridge client.
 
-Prebuilt releases target Windows 10 and newer.
+Prebuilt releases support Windows 10 and newer and x86_64 Linux.
 
 > [!IMPORTANT]
 > HapticScape, LumBridge, and the Local Event Bridge are unofficial software. They are not endorsed by Jagex, RuneLite, Intiface, or any device manufacturer.
 
  <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/580678a7-47d7-4c2c-8fd1-048a0f7a1a6c" />
+
+## 3.2.0
+
+- Unified launcher for HapticScape, LumBridge and updates.
+- Windows and Linux launcher installers with automatic app downloads.
+- Jagex sign-in with saved accounts and automatic session renewal.
+- Linux system and application audio capture through PipeWire.
+- Music feedback stops when playback pauses or the system is muted.
+- Encrypted remote pairing and saved unlock keys on Linux.
+- Persistent exit-without-unlocking history in saved subject profiles.
+- Connection links on Windows and Linux.
+- Launcher tray controls and optional hide to tray after Play.
 
 ## HapticScape 3 components
 
@@ -17,7 +29,7 @@ Prebuilt releases target Windows 10 and newer.
 | --- | --- |
 | **HapticScape** | Standalone desktop application. Owns haptics, clicks, music sync, settings, Remote Play, safety controls, and the UI. |
 | **Local Event Bridge** | Small RuneLite-side plugin that observes an allowlisted set of gameplay facts and publishes neutral events to HapticScape over localhost. |
-| **LumBridge** | RuneLite package with the Local Event Bridge built in. HapticScape 3 installs the matching LumBridge release automatically when it is missing. |
+| **LumBridge** | RuneLite with the Local Event Bridge built in. Installed and started by the launcher. |
 | **Intiface Central** | Connects supported haptic devices and exposes them to HapticScape over the Buttplug protocol. |
 | **Remote Play relay** | Optional WebSocket relay used to connect two HapticScape clients for encrypted remote sessions. |
 
@@ -30,6 +42,7 @@ The default gameplay bridge endpoint is `127.0.0.1:41713`. It binds only to IPv4
 - Windows 10 or newer.
 - [Intiface Central](https://intiface.com/) if you want haptic device output.
 - A device supported by Intiface if you want haptic output.
+
 The launcher downloads HapticScape, LumBridge and their Java runtime automatically. An internet connection is needed for the first download.
 
 ### New installation
@@ -43,64 +56,83 @@ The launcher downloads HapticScape, LumBridge and their Java runtime automatical
 
 Use **HapticScape Launcher** in the Start menu thereafter. No separate LumBridge download or Java installation is needed. **Open** starts HapticScape on its own.
 
-### Connect Intiface
-
-1. Open Intiface Central.
-2. Start the engine or server.
-3. Scan for and connect the device in Intiface.
-4. Confirm the device responds to Intiface's own controls.
-5. Open HapticScape.
-6. Leave the address at `ws://localhost:12345` when Intiface is on the same computer.
-7. Select **Connect**.
-8. Use the HapticScape test controls at a low intensity.
-
-Some devices ignore very low vibration values. Increase intensity gradually if the device is connected but does not respond.
-
-### Jagex Accounts and LumBridge
-
-Select **Add account** in the launcher and sign in to Jagex. Your account stays in the list until removed. Login credentials are stored encrypted, and the launcher renews sessions before Play when needed. No `credentials.properties` export is required.
-
 ### SmartScreen and checksums
 
-HapticScape releases are not code-signed, so Windows may show a SmartScreen warning.
+Windows may show a SmartScreen warning because the installer is not code-signed.
+Each installer has a matching `.sha256` file on the release page.
 
-The launcher installer has a matching `.exe.sha256` file. To verify a download:
+## Install on Linux
 
-```powershell
-Get-FileHash ".\HapticScape-Launcher-Windows-x64-X.Y.Z.exe" -Algorithm SHA256
+Use an x86_64 desktop with WebKitGTK 4.1, GTK 3 and a Secret Service wallet such as GNOME Keyring or KWallet. Music sync requires PipeWire. Install [Intiface Central](https://intiface.com/) for haptic device output.
+
+### Installer
+
+Download `HapticScape-Linux-x64-3.2.0.run` from [the latest release](https://github.com/birdturtle/HapticScape/releases/latest), then run:
+
+```sh
+bash HapticScape-Linux-x64-3.2.0.run
 ```
 
-Compare the displayed hash with the value in the matching `.exe.sha256` file.
+Open **HapticScape Launcher** from the application menu. Wait for the app downloads, add your Jagex account and select **Play**.
 
-## Migrating from HapticScape 2.x
+### Debian / Ubuntu
 
-HapticScape 3 changes the RuneLite integration model.
+Download the `.deb` from the release page and install it:
 
-HapticScape 2.x ran HapticScape code inside a custom RuneLite client. HapticScape 3 runs as a separate desktop application. RuneLite only provides neutral gameplay events through the Local Event Bridge.
-
-### Upgrade through the built-in updater
-
-The existing updater uses the full HapticScape ZIP behind the scenes. It replaces the old entry point with the unified launcher and includes both apps and Java. Existing shortcuts continue opening the launcher; Play starts both applications.
-
-### Settings after migration
-
-HapticScape 3 stores its standalone settings under:
-
-```text
-%LOCALAPPDATA%\HapticScape
+```sh
+sudo apt install ./hapticscape-launcher_3.2.0_amd64.deb
 ```
 
-Updater preferences are migrated from the older HapticScape update location when possible.
+### Arch / CachyOS (AUR)
 
-The old RuneLite plugin configuration is not the HapticScape 3 settings store. Review your XP, alert, click, Intiface, Remote Play, and custom pattern settings after the first 3.x launch before relying on them.
+Install with yay or paru:
 
-### What changes for normal use
+```sh
+yay -S hapticscape-launcher-bin
+```
 
-- Start `HapticScape.exe` for the main application.
-- Start LumBridge for gameplay events.
-- Intiface still runs separately.
-- Remote Play still runs between HapticScape clients, not between RuneLite clients.
-- HapticScape no longer depends on RuneLite APIs, UI classes, settings APIs, or device control code.
+```sh
+paru -S hapticscape-launcher-bin
+```
+
+For optional Intiface setup, run the helper as your normal user:
+
+```sh
+git clone https://github.com/birdturtle/HapticScape.git
+cd HapticScape
+bash packaging/aur/setup-intiface.sh
+```
+
+The helper asks whether to install Intiface and offers the binary or source package.
+
+## Using the launcher
+
+- **Add account** opens Jagex sign-in. Added accounts stay saved until removed.
+- Select an account and character, then **Play** to start LumBridge and HapticScape.
+- **Open** starts HapticScape on its own.
+- Closing the launcher hides it to the tray. Use **Restore** or **Exit** from its tray menu.
+- **Hide the launcher to the tray after Play** is available in Settings.
+- Exiting the launcher leaves HapticScape and LumBridge running.
+
+No separate LumBridge download, Java installation or `credentials.properties` export is needed.
+
+## Connect Intiface
+
+1. Open Intiface Central and start its engine or server.
+2. Scan for and connect your device.
+3. Confirm the device responds to Intiface's test controls.
+4. In HapticScape, use `ws://localhost:12345` and select **Connect**.
+5. Test a pattern at low intensity.
+
+Some devices ignore very low vibration values.
+
+## Upgrading
+
+Use **Updates** in the launcher to check for updates and install them. Close HapticScape and LumBridge before installing. Linux package-manager installations use apt, yay or paru for launcher updates.
+
+Older Windows installations can migrate through their existing updater. Existing shortcuts open the new launcher. Accounts, profiles and pairing data are retained.
+
+Users coming from the old 2.x RuneLite plugin should review their feedback settings after upgrading. The standalone app uses a separate settings store.
 
 ## Features
 
@@ -180,7 +212,7 @@ On wide windows, the Forge can remain visible beside the main workspace. On smal
 
 ### Music sync
 
-Music sync uses PCM audio capture on Windows and experimentally on Linux. **Entire output** analyzes a selected output using WASAPI on Windows or PipeWire on Linux. **Application audio** captures one playback application, allowing music or a game client to drive haptics without reacting to every system sound. **Default system output** follows the system default; other active output endpoints remain selectable. Linux application capture groups streams by the application's advertised identity; see [implementation and acceptance](docs/linux-application-capture-testing.md).
+Music sync turns audio into haptic feedback on Windows and Linux. Choose **Entire output** for an audio output or **Application audio** for one playback application. **Default system output** follows your current default device.
 
 Controls include:
 
@@ -189,14 +221,14 @@ Controls include:
 - Minimum haptic output.
 - Maximum haptic output.
 - Live output meter.
-- Windows master volume and mute scaling.
+- System volume and mute handling.
+- Output stops when playback pauses.
 - Local capture-mode, output-source, and mixer-application selection.
 - Manual refresh after an output or application starts, stops, or moves.
 
 Finite XP, alert, preview, remote pattern, and Live Forge output can temporarily take the haptic channel. Music sync resumes afterward.
 
-Music sync analyzes audio in memory. It does not record or upload the audio stream.
-The selected endpoint ID is stored only on that computer and is never included in Remote Play settings. If an explicitly selected endpoint disappears, Music sync stops with a visible error rather than silently capturing a different output.
+Music sync does not record or upload audio. If the selected output disappears, capture stops until an available output is selected.
 
 ### Audio click feedback
 
@@ -376,7 +408,7 @@ If accepted:
 - The selected final values remain locked after the session ends.
 - The unlock key is generated on the controller side.
 - The controller can save the accepted key locally.
-- Saved unlock keys use Windows DPAPI for the current Windows account.
+- Saved unlock keys are encrypted for your local account.
 - Emergency Off, End session, Intiface controls, Remote Play permissions, Forge, Music, and developer recovery remain available.
 
 #### Protected startup and exit
@@ -385,49 +417,33 @@ A participant can separately allow protected startup and exit requests.
 
 A protected lock can include:
 
-- Start HapticScape with Windows.
+- Start HapticScape when you sign in.
 - Start minimized to the tray.
 - Password-protected application exit.
 
-When protected exit is active, closing from the tray or other exit path requires the lock password. After 10 seconds, **Exit without password** becomes available. Using it stops output, records an unauthorized end, and reports the event to the controller when possible. On the controller, a matching saved subject profile shows an **Exits without unlocking** count and timestamped history for that lock in Saved unlock keys → Manage. This history persists across restarts and leaves the profile’s note unchanged. A new lock starts a new history; repeated delivery of the same event does not increase the count.
+Protected exit requires the lock password. After 10 seconds, **Exit without password** becomes available and stops output. The controller's saved subject profile shows the count and timestamped history under **Saved unlock keys > Manage**. History persists across restarts for the lifetime of that lock.
 
 #### Saved Unlock Keys
 
 Controllers can keep accepted unlock keys in a local vault.
 
-- Windows DPAPI protection for the current Windows account.
+- Encrypted storage for your local account.
 - Optional labels and notes.
 - Copy a key when it is needed.
 - Delete saved entries.
 
 ### Updates
 
-The unified launcher handles updates for HapticScape, LumBridge, and the bundled Java runtime.
-HapticScape itself no longer has update controls.
+The launcher updates HapticScape, LumBridge and Java together.
 
-In launcher Settings, choose whether to check at startup or include beta updates,
-then save preferences. Both options default to off. The Updates page provides
-**Check for updates** and **Install update and restart** for compatible newer releases.
-Close both apps before installing. Downloads are checked against SHA-256 checksums
-and validated before replacement; failed startup restores the previous installation.
-
-Stable updates exclude prereleases. Enabling **Include beta updates** also considers
-published prereleases. Linux package-manager installations are updated through the
-package manager. Older Windows installations retain their migration helpers.
+- **Check for updates** and **Install update and restart** are on the Updates page.
+- Settings includes automatic checks at startup and **Include beta updates**.
+- Failed updates restore the previous installation.
+- Linux package-manager installations use their package manager for launcher updates.
 
 ### LumBridge
 
-LumBridge packages RuneLite with only the Local Event Bridge built in.
-
-It does not contain the HapticScape runtime, haptic device code, Remote Play, music sync, settings UI, clicker, Intiface client, or update logic from the main application.
-
-LumBridge publishes the bridge allowlist to HapticScape over `127.0.0.1:41713`.
-
-The HapticScape repository records the exact upstream bridge commit included in each LumBridge build in:
-
-```text
-runelite-bridge-client/BRIDGE-SOURCE.properties
-```
+LumBridge is RuneLite with the Local Event Bridge built in. It supplies gameplay events to HapticScape while you play.
 
 ## Gameplay bridge and privacy
 
@@ -459,23 +475,14 @@ The optional activity feed uses an explicit allowlist and does not transmit raw 
 
 ### Local files
 
-Default Windows application data is stored under:
+HapticScape settings, profiles and remote data are stored in:
 
-```text
-%LOCALAPPDATA%\HapticScape
-```
+| Platform | Location |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\HapticScape` |
+| Linux | `~/.hapticscape` |
 
-This includes normal settings plus separate files for persistent locks, protected-exit state, Discord device credentials, and saved unlock keys.
-
-Named local test profiles are stored under:
-
-```text
-%LOCALAPPDATA%\HapticScape\profiles\<name>
-```
-
-Secret stores use dedicated protection where supported. Saved unlock keys and Discord device credentials use Windows DPAPI.
-
-The experimental Linux backend uses Secret Service through libsecret, with authenticated encrypted file payloads and keyring-held encryption keys. KDE acceptance remains pending; see [Linux keyring implementation and testing](docs/linux-keyring-testing.md). Music Sync has experimental PipeWire backends for [output capture](docs/linux-pipewire-testing.md) and [application-only capture](docs/linux-application-capture-testing.md). Linux desktop installation and release packaging remain unfinished.
+Named profiles are under `profiles/<name>` within that directory. Saved unlock keys and Discord credentials use Windows DPAPI or the Linux Secret Service wallet.
 
 ## FAQ
 
@@ -489,11 +496,11 @@ LumBridge is RuneLite with the Local Event Bridge built in.
 
 ### Do I need to download LumBridge manually?
 
-Normally no. HapticScape 3 checks for the matching LumBridge version and installs it beside HapticScape when it is missing.
+No. The launcher downloads the matching LumBridge version automatically.
 
 ### Can I use normal RuneLite?
 
-Not yet. TBA?
+Use LumBridge for gameplay feedback. Normal RuneLite does not include the Local Event Bridge.
 
 ### Does HapticScape need Intiface if I only want clicks?
 
@@ -505,19 +512,19 @@ HapticScape sends compatible output to discovered devices with supported vibrati
 
 ### Where are HapticScape 3 settings stored?
 
-On Windows, the default location is `%LOCALAPPDATA%\HapticScape`.
+Windows: `%LOCALAPPDATA%\HapticScape`. Linux: `~/.hapticscape`.
 
 ### Will my old 2.x plugin settings automatically become 3.x settings?
 
 Do not assume that they will. HapticScape 3 uses its own standalone settings store. Review the configuration after migration.
 
-### Why does LumBridge need RuneLite or Java installed?
+### Do I need Java or RuneLite installed separately?
 
-LumBridge is a Java RuneLite client. Its launcher first looks for the official RuneLite JRE, then `JAVA_HOME`, then Java on `PATH`.
+No. The launcher installs the required runtime and LumBridge.
 
-### Why does LumBridge not show my Jagex Account session?
+### How do I sign in with a Jagex account?
 
-Custom RuneLite development clients can require RuneLite's development credential setup. Follow RuneLite's Jagex Account development guide linked in the installation section.
+Select **Add account** in the launcher. Saved sessions renew automatically. If Jagex requires another sign-in, the launcher asks you to sign in again.
 
 ### Does the Remote Play activity feed send my private messages?
 
@@ -543,36 +550,19 @@ No. After 10 seconds, the protected exit dialog exposes **Exit without password*
 
 No. Audio analysis is local and in-memory.
 
-### Can I run two HapticScape clients on one PC for testing?
+### Does HapticScape run on Linux or macOS?
 
-Yes. Use separate profiles and gameplay ports. For example:
-
-```powershell
-.\HapticScape.exe --profile subject --gameplay-port 41713
-.\HapticScape.exe --profile controller --gameplay-port 41714
-```
-
-Leave the subject on `41713` when it should receive events from the standard Local Event Bridge.
-
-### Does HapticScape run on macOS or Linux?
-
-The source is Java-based, but the supported prebuilt release is Windows. Music sync, Windows startup integration, the packaged launchers, system tray behavior, and DPAPI-backed secret storage contain Windows-specific code.
+Windows and x86_64 Linux are supported. There is no macOS package.
 
 ## Troubleshooting
 
-### HapticScape does not start
+### An application does not start
 
-- Extract the ZIP before running it.
-- Keep `HapticScape.exe`, `app`, and `runtime` together.
-- Move the installation to a folder your Windows account can write to.
-- Check whether antivirus or SmartScreen blocked the launcher or runtime.
-
-### LumBridge does not start
-
-- Install or repair the official RuneLite launcher.
-- Confirm Java 11+ is available if you are not using RuneLite's JRE.
-- Keep `LumBridge.exe` beside its `app` folder.
-- If application downloads fail, use **Retry installation** in the launcher.
+- Open HapticScape Launcher and wait for installation to finish.
+- Use **Retry installation** if a download failed.
+- Check whether antivirus or SmartScreen blocked the launcher or runtime on Windows.
+- On Linux, confirm the required desktop libraries and Secret Service wallet are available.
+- Check **Settings > Troubleshooting** for application paths.
 
 ### HapticScape shows no gameplay activity
 
@@ -606,9 +596,9 @@ The source is Java-based, but the supported prebuilt release is Windows. Music s
 ### Music sync shows no output
 
 - Confirm audio is playing through the endpoint selected under **Audio source**.
-- Select **Default Windows output** to follow the current Windows default, or press **Refresh** after connecting or enabling a new output device.
+- Select **Default system output** to follow the current default, or press **Refresh** after connecting a new output device.
 - For **Application audio**, start playback in the application before refreshing the list. The saved selection waits quietly if that application later closes.
-- Confirm Windows is not muted.
+- Confirm the system is not muted. On Linux, confirm PipeWire is running.
 - Raise Music sensitivity and maximum intensity.
 - Raise minimum intensity if the device ignores low output values.
 
@@ -622,11 +612,10 @@ The source is Java-based, but the supported prebuilt release is Windows. Music s
 
 ### Discord Accept does not open HapticScape
 
-- Run the packaged `HapticScape.exe` once so it can register the `hapticscape://` handler.
 - Confirm both users linked the Discord app.
-- Allow the browser to open the HapticScape protocol link.
-- Keep the HapticScape folder in one location. Running `HapticScape.exe` again updates the handler if the folder moved.
-- Use manual connection codes if Windows policy blocks per-user protocol registration.
+- Allow the browser to open the `hapticscape://` link.
+- Run the launcher installer again to restore connection-link registration.
+- Use a manual connection code if the browser blocks the link.
 
 ## Build from source
 
@@ -636,14 +625,15 @@ HapticScape targets Java 11 and includes the Gradle wrapper.
 
 - Git
 - Java 11 JDK
-- Windows for the packaged launchers and Windows release bundle
-- .NET Framework 4.x for compiling the native Windows launchers
+- Node.js 22+ and Rust for the unified launcher
+- Windows and .NET Framework 4.x for Windows packaging
+- Linux desktop development libraries for Linux packaging
 - Intiface Central for device testing
 
 Clone the repository:
 
 ```powershell
-git clone https://github.com/ashy0019/HapticScape.git
+git clone https://github.com/birdturtle/HapticScape.git
 cd HapticScape
 ```
 
@@ -705,7 +695,7 @@ Create the `vX.Y.Z` tag on the release commit before packaging. On Windows, chec
 git fetch origin --tags
 git switch --detach vX.Y.Z
 Get-Content .\runelite-bridge-client\RUNTIME.properties
-.\package-all.ps1 -Version X.Y.Z
+.\package-all.ps1 -Version X.Y.Z -UnifiedLauncher
 Get-Content .\build\bridge-windows-package\LumBridge\app\release.json
 ```
 
@@ -721,18 +711,9 @@ HapticScape-Windows-x64-X.Y.Z.zip.sha256
 HapticScape-Suite-X.Y.Z.json
 ```
 
-The desktop packager runs tests, builds the standalone JAR, creates a trimmed Java runtime, compiles `HapticScape.exe` and the updater, collects licenses, and creates the ZIP and checksum.
+The installer is the user download. The ZIP, suite descriptor and checksums are used for automatic downloads and older updater migration.
 
-The LumBridge packager builds the companion app. Unified packaging includes it in the internal suite payload and removes the separate LumBridge ZIP. Users download only the launcher EXE; the full suite ZIP and descriptor remain release assets for automatic downloads and older updater compatibility.
-
-Test the packaged executables before publishing:
-
-```text
-build\windows-package\HapticScape\HapticScape.exe
-build\bridge-windows-package\LumBridge\LumBridge.exe
-```
-
-For an updater-compatible release, keep the Git tag, embedded HapticScape version, HapticScape ZIP version, LumBridge embedded version, and checksum filenames on the same version.
+For Linux packaging and launcher development, see [the launcher README](suite-launcher/README.md) and [Linux packaging](packaging/linux/README-LINUX.md).
 
 ## Run two local HapticScape clients
 
@@ -791,8 +772,8 @@ HapticScape cannot determine a safe or comfortable output level for a particular
 
 ## License and support
 
-HapticScape is distributed under the terms in [LICENSE](LICENSE). Windows release bundles include applicable third-party notices and licenses.
+HapticScape is distributed under the terms in [LICENSE](LICENSE). Release packages include applicable third-party notices and licenses.
 
 RuneLite, Old School RuneScape, Jagex, Intiface, Buttplug, Windows, Discord, and related names and trademarks belong to their respective owners.
 
-Report reproducible problems through [GitHub Issues](https://github.com/ashy0019/HapticScape/issues).
+Report reproducible problems through [GitHub Issues](https://github.com/birdturtle/HapticScape/issues).
