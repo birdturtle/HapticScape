@@ -196,7 +196,7 @@ public final class SettingsBackedHapticScapeSettings implements HapticScapeSetti
     {
         return stringValue(
             HapticScapeSettingKeys.MUSIC_CAPTURE_ENDPOINT_NAME,
-            "Default Windows output"
+            "Default system output"
         );
     }
 

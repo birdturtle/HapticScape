@@ -40,10 +40,10 @@ public class WasapiApplicationLoopbackCaptureTest
 	}
 
 	@Test
-	public void desktopFactoryUsesPcmApplicationLoopbackCapture()
+	public void windowsDesktopFactoryUsesPcmApplicationLoopbackCapture()
 	{
 		assertTrue(
-			DesktopAudioCaptureSources.factory().createApplication(
+			DesktopAudioCaptureSources.factory(DesktopPlatform.WINDOWS).createApplication(
 				new AudioCaptureApplication("command:c:\\apps\\player.exe", "Player")
 			) instanceof WasapiApplicationLoopbackCapture
 		);

@@ -31,8 +31,6 @@ import com.ashy0019.hapticscape.remote.SettingsBackedRemoteSettingsStore;
 import com.ashy0019.hapticscape.remote.SettingsLockCatalog;
 import com.ashy0019.hapticscape.remote.SettingsLockService;
 import com.ashy0019.hapticscape.rogue.RogueFeedbackEvent;
-import com.ashy0019.hapticscape.update.UpdateCheckService;
-import com.ashy0019.hapticscape.update.UpdatePreferencesStore;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
@@ -67,8 +65,6 @@ public final class HapticScapeRuntime implements AutoCloseable
     private RemoteSessionManager remoteSessionManager;
     private GameplayEventCoordinator gameplayEvents;
     private LocalhostGameplayEventServer gameplayTransportServer;
-    private UpdatePreferencesStore updatePreferencesStore;
-    private UpdateCheckService updateCheckService;
     private RemotePairingService remotePairingService;
     private DiscordPairingBridge discordPairingBridge;
     private boolean started;
@@ -181,14 +177,6 @@ public final class HapticScapeRuntime implements AutoCloseable
                 dependencies.getGameplayPort()
             );
 
-            updatePreferencesStore = new UpdatePreferencesStore(
-                dependencies.getGson(),
-                dependencies.getStoragePaths()
-            );
-            updateCheckService = new UpdateCheckService(
-                dependencies.getHttpClient(),
-                dependencies.getGson()
-            );
             remotePairingService = new RemotePairingService(dependencies.getHttpClient());
             discordPairingBridge = new DiscordPairingBridge(
                 dependencies.getHttpClient(),
@@ -281,18 +269,6 @@ public final class HapticScapeRuntime implements AutoCloseable
     {
         ensureStarted();
         return settingsLockService;
-    }
-
-    public UpdatePreferencesStore getUpdatePreferencesStore()
-    {
-        ensureStarted();
-        return updatePreferencesStore;
-    }
-
-    public UpdateCheckService getUpdateCheckService()
-    {
-        ensureStarted();
-        return updateCheckService;
     }
 
     public RemoteSettingsSnapshot effectiveSettings()
@@ -522,15 +498,5 @@ public final class HapticScapeRuntime implements AutoCloseable
         }
         settingsLockService = null;
         remotePairingService = null;
-        if (updateCheckService != null)
-        {
-            updateCheckService.close();
-            updateCheckService = null;
-        }
-        if (updatePreferencesStore != null)
-        {
-            updatePreferencesStore.close();
-            updatePreferencesStore = null;
-        }
     }
 }

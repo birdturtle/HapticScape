@@ -3,7 +3,9 @@ param(
     [ValidatePattern("^[0-9]+(?:\.[0-9]+){0,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$")]
     [string]$Version,
 
-    [string]$RuneLiteVersion
+    [string]$RuneLiteVersion,
+
+    [switch]$UnifiedLauncher = $true
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,6 +94,8 @@ try
         & $bridgePackager -Version $Version -RuneLiteVersion $RuneLiteVersion
     }
 
+    if ($UnifiedLauncher) { & (Join-Path $projectRoot 'package-unified-launcher.ps1') -Version $Version -Architecture $architecture }
+
     if (-not (Test-Path $desktopZip -PathType Leaf))
     {
         throw "Standalone HapticScape package was not created: $desktopZip"
@@ -102,11 +106,14 @@ try
     }
 
     Write-Host ''
-    Write-Host 'Both packages created successfully:' -ForegroundColor Green
+    if ($UnifiedLauncher) {
+        Remove-Item $bridgeZip, "$bridgeZip.sha256" -Force
+        Write-Host "User download: $(Join-Path $distributionDirectory "HapticScape-Launcher-Windows-$architecture-$Version.exe")"
+    }
+    Write-Host 'Packages created successfully:' -ForegroundColor Green
     Write-Host "  $desktopZip"
     Write-Host "  $desktopZip.sha256"
-    Write-Host "  $bridgeZip"
-    Write-Host "  $bridgeZip.sha256"
+    if (!$UnifiedLauncher) { Write-Host "  $bridgeZip"; Write-Host "  $bridgeZip.sha256" }
 }
 finally
 {

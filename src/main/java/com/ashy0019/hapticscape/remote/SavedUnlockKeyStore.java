@@ -43,6 +43,7 @@ public final class SavedUnlockKeyStore
 	private final UnlockKeyProtector protector;
 	private final Clock clock;
 	private List<SavedUnlockKey> entries = Collections.emptyList();
+	private final Set<String> forgottenLockIds = new HashSet<>();
 	private String loadFailure;
 
 	public SavedUnlockKeyStore(
@@ -70,10 +71,9 @@ public final class SavedUnlockKeyStore
 			? Objects.requireNonNull(path, "path")
 			: path;
 		this.clock = Objects.requireNonNull(clock, "clock");
-		if (protector.isAvailable())
-		{
-			load();
-		}
+		// Metadata and envelope validation never unlock the wallet. Always inspect an
+		// existing file, even if secure storage is temporarily unavailable.
+		if (path != null) load();
 	}
 
 	static SavedUnlockKeyStore disabled(Gson gson)
@@ -85,6 +85,8 @@ public final class SavedUnlockKeyStore
 			Clock.systemUTC()
 		);
 	}
+
+	boolean requiresBackgroundThread() { return protector.requiresBackgroundThread(); }
 
 	public boolean isAvailable()
 	{
@@ -112,7 +114,7 @@ public final class SavedUnlockKeyStore
 			.findFirst();
 	}
 
-	public synchronized SavedUnlockKey saveAcceptedKey(String lockId, char[] unlockKey)
+	public SavedUnlockKey saveAcceptedKey(String lockId, char[] unlockKey)
 	{
 		ensureAvailable();
 		Objects.requireNonNull(lockId, "lockId");
@@ -143,11 +145,17 @@ public final class SavedUnlockKeyStore
 				Base64.getEncoder().encodeToString(protectedBytes)
 			);
 			entry.validate();
-			List<SavedUnlockKey> updated = new ArrayList<>(entries);
-			updated.add(0, entry);
-			persist(updated);
-			entries = Collections.unmodifiableList(updated);
-			return entry;
+			synchronized (this)
+			{
+				requireNotForgotten(lockId);
+				Optional<SavedUnlockKey> concurrent = findByLockId(lockId);
+				if (concurrent.isPresent()) return concurrent.get();
+				List<SavedUnlockKey> updated = new ArrayList<>(entries);
+				updated.add(0, entry);
+				persist(updated);
+				entries = Collections.unmodifiableList(updated);
+				return entry;
+			}
 		}
 		finally
 		{
@@ -159,7 +167,7 @@ public final class SavedUnlockKeyStore
 		}
 	}
 
-	public synchronized SavedUnlockKey saveAcceptedProfileKey(
+	public SavedUnlockKey saveAcceptedProfileKey(
 		String lockId,
 		String subjectId,
 		String profileName,
@@ -189,15 +197,25 @@ public final class SavedUnlockKeyStore
 				Base64.getEncoder().encodeToString(protectedBytes)
 			);
 			entry.validate();
-			List<SavedUnlockKey> updated = new ArrayList<>(entries);
-			updated.removeIf(existing ->
-				requiredSubjectId.equals(existing.getSubjectId())
-					|| lockId.equals(existing.getLockId())
-			);
-			updated.add(0, entry);
-			persist(updated);
-			entries = Collections.unmodifiableList(updated);
-			return entry;
+			synchronized (this)
+			{
+				requireNotForgotten(lockId);
+				List<SavedUnlockKey> updated = new ArrayList<>(entries);
+				for (SavedUnlockKey existing : entries)
+				{
+					if (!lockId.equals(existing.getLockId())) continue;
+					for (SavedUnlockKey.ExitEvent event : existing.getUnauthorizedEnds())
+						entry = entry.withUnauthorizedEnd(event.getEventId(), event.getOccurredAt().toEpochMilli());
+				}
+				updated.removeIf(existing ->
+					requiredSubjectId.equals(existing.getSubjectId())
+						|| lockId.equals(existing.getLockId())
+				);
+				updated.add(0, entry);
+				persist(updated);
+				entries = Collections.unmodifiableList(updated);
+				return entry;
+			}
 		}
 		finally
 		{
@@ -207,6 +225,34 @@ public final class SavedUnlockKeyStore
 				Arrays.fill(protectedBytes, (byte) 0);
 			}
 		}
+	}
+
+	/** Records authenticated exit notices without opening or changing the protected key. */
+	public synchronized boolean recordUnauthorizedEnd(String subjectId, long occurredAtMillis)
+	{
+		return recordUnauthorizedEnd(subjectId, null, "legacy-" + occurredAtMillis, occurredAtMillis);
+	}
+
+	public synchronized boolean recordUnauthorizedEnd(
+		String subjectId, String lockId, String eventId, long occurredAtMillis)
+	{
+		if (subjectId == null || path == null || loadFailure != null) return false;
+		if (occurredAtMillis <= 0 || eventId == null || eventId.isEmpty() || eventId.length() > 80)
+			throw new IllegalArgumentException("Invalid exit event");
+		for (int index = 0; index < entries.size(); index++)
+		{
+			SavedUnlockKey entry = entries.get(index);
+			if (!subjectId.equals(entry.getSubjectId())
+				|| (lockId != null && !lockId.equals(entry.getLockId()))) continue;
+			if (entry.getUnauthorizedEnds().stream().anyMatch(event -> eventId.equals(event.getEventId())))
+				return true;
+			List<SavedUnlockKey> updated = new ArrayList<>(entries);
+			updated.set(index, entry.withUnauthorizedEnd(eventId, occurredAtMillis));
+			persist(updated);
+			entries = Collections.unmodifiableList(updated);
+			return true;
+		}
+		return false;
 	}
 
 	public synchronized SavedUnlockKey updateDetails(
@@ -225,11 +271,11 @@ public final class SavedUnlockKeyStore
 	}
 
 	/** Returns a caller-owned key array and records successful access. */
-	public synchronized char[] reveal(String id)
+	public char[] reveal(String id)
 	{
 		ensureAvailable();
-		int index = indexOf(id);
-		SavedUnlockKey entry = entries.get(index);
+		SavedUnlockKey entry;
+		synchronized (this) { entry = entries.get(indexOf(id)); }
 		byte[] protectedBytes;
 		try
 		{
@@ -245,12 +291,17 @@ public final class SavedUnlockKeyStore
 		{
 			plaintext = protector.unprotect(protectedBytes);
 			key = fromAscii(plaintext);
-			SavedUnlockKey accessed = entry.withLastUsedAt(clock.millis());
-			List<SavedUnlockKey> updated = new ArrayList<>(entries);
-			updated.set(index, accessed);
-			persist(updated);
-			entries = Collections.unmodifiableList(updated);
-			return key;
+			synchronized (this)
+			{
+				int index = indexOf(id);
+				// A concurrent rename must survive the access timestamp update.
+				SavedUnlockKey accessed = entries.get(index).withLastUsedAt(clock.millis());
+				List<SavedUnlockKey> updated = new ArrayList<>(entries);
+				updated.set(index, accessed);
+				persist(updated);
+				entries = Collections.unmodifiableList(updated);
+				return key;
+			}
 		}
 		catch (RuntimeException e)
 		{
@@ -278,15 +329,19 @@ public final class SavedUnlockKeyStore
 		{
 			return false;
 		}
+		String lockId = entries.get(index).getLockId();
 		List<SavedUnlockKey> updated = new ArrayList<>(entries);
 		updated.remove(index);
 		persist(updated);
+		forgottenLockIds.add(lockId);
 		entries = Collections.unmodifiableList(updated);
 		return true;
 	}
 
 	synchronized boolean forgetByLockId(String lockId)
 	{
+		// A cancelled lock must not reappear when an outstanding wallet prompt finishes.
+		forgottenLockIds.add(lockId);
 		if (!isAvailable())
 		{
 			return false;
@@ -299,6 +354,12 @@ public final class SavedUnlockKeyStore
 			entries = Collections.unmodifiableList(updated);
 		}
 		return removed;
+	}
+
+	private void requireNotForgotten(String lockId)
+	{
+		if (forgottenLockIds.contains(lockId))
+			throw new IllegalStateException("The lock was cancelled or forgotten before its key could be saved");
 	}
 
 	private void load()
@@ -334,6 +395,15 @@ public final class SavedUnlockKeyStore
 			for (SavedUnlockKey entry : loaded)
 			{
 				entry.validate();
+				byte[] payload = Base64.getDecoder().decode(entry.getProtectedKey());
+				try
+				{
+					protector.validateCiphertext(payload);
+				}
+				finally
+				{
+					Arrays.fill(payload, (byte) 0);
+				}
 				if (!entryIds.add(entry.getId()) || !lockIds.add(entry.getLockId()))
 				{
 					throw new IllegalArgumentException("Saved-key vault contains duplicates");

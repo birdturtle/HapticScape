@@ -51,8 +51,6 @@ import com.ashy0019.hapticscape.remote.SettingsLockTarget;
 import com.ashy0019.hapticscape.remote.SettingsStore;
 import com.ashy0019.hapticscape.rogue.ui.RogueLauncherPanel;
 import com.ashy0019.hapticscape.rogue.ui.RoguePanel;
-import com.ashy0019.hapticscape.update.UpdateCheckService;
-import com.ashy0019.hapticscape.update.UpdatePreferencesStore;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
@@ -161,7 +159,6 @@ public final class HapticScapePanel extends JPanel
 	private final ClickOutputPanel clickOutputPanel;
 	private final XpClickSettingsPanel xpClickSettingsPanel;
 	private final ClickerPhraseRulesPanel phraseRulesPanel;
-	private final UpdatesPanel updatesPanel;
 	private final ApplicationStartupPanel applicationStartupPanel;
 	private final RemoteSessionManager remoteSessionManager;
 	private final SettingsLockService settingsLockService;
@@ -229,8 +226,6 @@ public final class HapticScapePanel extends JPanel
 		Consumer<AudioCaptureEndpoint> audioCaptureEndpointAction,
 		Consumer<ClickerSettings> clickerSettingsAction,
 		Runnable testClickAction,
-		UpdatePreferencesStore updatePreferencesStore,
-		UpdateCheckService updateCheckService,
 		RemoteSessionManager remoteSessionManager,
 		RemotePairingService remotePairingService,
 		DiscordPairingBridge discordPairingBridge,
@@ -465,7 +460,6 @@ public final class HapticScapePanel extends JPanel
 			clickerSettingsAction,
 			testClickAction
 		);
-		updatesPanel = new UpdatesPanel(updatePreferencesStore, updateCheckService);
 		applicationStartupPanel = new ApplicationStartupPanel(
 			(key, value) -> writeFeedbackSetting(
 				SettingsLockCatalog.STARTUP_BEHAVIOR, key, value),
@@ -613,7 +607,6 @@ public final class HapticScapePanel extends JPanel
 		applicationSettings.setLayout(new BoxLayout(applicationSettings, BoxLayout.Y_AXIS));
 		PanelUi.addPreferredHeightComponent(applicationSettings, clickOutputPanel);
 		PanelUi.addPreferredHeightComponent(applicationSettings, applicationStartupPanel);
-		PanelUi.addPreferredHeightComponent(applicationSettings, updatesPanel);
 		JPanel settingsWorkspace = new ResponsiveColumnsPanel(
 			deviceSettings,
 			applicationSettings,
@@ -1732,7 +1725,7 @@ public final class HapticScapePanel extends JPanel
 		phraseRulesPanel.setRemoteReadOnly(feedbackReadOnly);
 		customPatternsPanel.setRemoteReadOnly(forgeAndMusicReadOnly);
 		musicPanel.setRemoteReadOnly(forgeAndMusicReadOnly);
-		// Tabs, navigation selectors, Casino/Rogue, Updates, Intiface connection,
+		// Tabs, navigation selectors, Casino/Rogue, Intiface connection,
 		// Remote Control controls, and Emergency Off intentionally remain usable.
 	}
 

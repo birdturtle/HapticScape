@@ -27,7 +27,7 @@ public interface HapticScapeSettingsSource extends RemoteSettingsSource, RemoteP
     /** Last known local endpoint label, used when a saved device is unavailable. */
     default String musicCaptureEndpointName()
     {
-        return "Default Windows output";
+        return "Default system output";
     }
 
 	/** Local-only selection between whole-output and application mixer capture. */

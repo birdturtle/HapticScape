@@ -31,7 +31,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 
-/** Disconnected-only manager for DPAPI-protected post-session unlock keys. */
+/** Disconnected-only manager for platform-protected post-session unlock keys. */
 final class SavedUnlockKeysPanel extends JPanel
 {
 	private final RemoteSessionManager sessionManager;
@@ -47,6 +47,7 @@ final class SavedUnlockKeysPanel extends JPanel
 	private final WrappedTextLabel detailLabel = new WrappedTextLabel("No key selected");
 	private final JLabel createdLabel = metadataLabel("");
 	private final JLabel lastUsedLabel = metadataLabel("");
+	private final JTextArea exitNotice = new JTextArea(4, 20);
 	private final JTextArea note = new JTextArea(4, 20);
 	private final JButton copyButton = new JButton("Copy key");
 	private final JButton editButton = new JButton("Edit details");
@@ -55,6 +56,7 @@ final class SavedUnlockKeysPanel extends JPanel
 		"MMM d, yyyy h:mm a"
 	).withZone(ZoneId.systemDefault());
 	private boolean managerOpen;
+	private boolean copying;
 
 	SavedUnlockKeysPanel(RemoteSessionManager sessionManager, TextClipboard clipboard)
 	{
@@ -73,7 +75,7 @@ final class SavedUnlockKeysPanel extends JPanel
 		JPanel text = new JPanel();
 		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 		WrappedTextLabel explanation = new WrappedTextLabel(
-			"Accepted post-session unlock keys are protected by Windows. "
+			"Accepted post-session unlock keys use secure storage for your desktop account. "
 				+ "Invitations and session keys are never saved."
 		);
 		explanation.setBorder(BorderFactory.createEmptyBorder(0, 2, 3, 2));
@@ -124,7 +126,8 @@ final class SavedUnlockKeysPanel extends JPanel
 				SavedUnlockKey entry = value instanceof SavedUnlockKey
 					? (SavedUnlockKey) value
 					: null;
-				setText(entry == null ? "" : entry.getLabel());
+				setText(entry == null ? "" : entry.getLabel()
+					+ (entry.getLastUnauthorizedEndAt() == null ? "" : " — " + entry.getUnauthorizedEnds().size() + " exits without unlocking"));
 				if (entry != null && entry.isProfileKey())
 				{
 					setFont(getFont().deriveFont(Font.BOLD));
@@ -157,6 +160,13 @@ final class SavedUnlockKeysPanel extends JPanel
 		PanelUi.addPreferredHeightComponent(details, detailLabel);
 		PanelUi.addPreferredHeightComponent(details, createdLabel);
 		PanelUi.addPreferredHeightComponent(details, lastUsedLabel);
+		exitNotice.setName("savedUnlockKeyExitNotice");
+		exitNotice.setEditable(false);
+		exitNotice.setLineWrap(true);
+		exitNotice.setWrapStyleWord(true);
+		JScrollPane exitScroll = new JScrollPane(exitNotice);
+		exitScroll.setBorder(PanelUi.createSectionBorder("Exits without unlocking — this lock"));
+		PanelUi.addPreferredHeightComponent(details, exitScroll);
 		note.setName("savedUnlockKeyNote");
 		note.setEditable(false);
 		note.setFocusable(false);
@@ -201,8 +211,11 @@ final class SavedUnlockKeysPanel extends JPanel
 			sessionManager.getSavedUnlockKeyVaultMessage(),
 			entries.size()
 		);
-		summaryStatus.setPlainText(state.getStatus());
-		summaryStatus.setToolTipText(state.getStatus());
+		long exitCount = entries.stream().filter(entry -> entry.getLastUnauthorizedEndAt() != null).count();
+		String summary = state.getStatus() + (exitCount == 0 ? ""
+			: " • " + exitCount + " saved profile(s) exited without unlocking. Open Manage for details.");
+		summaryStatus.setPlainText(summary);
+		summaryStatus.setToolTipText(summary);
 		manageButton.setEnabled(state.isManageable());
 		manageButton.setToolTipText(available ? null : state.getStatus());
 		managerStatus.setPlainText(state.getStatus());
@@ -278,11 +291,24 @@ final class SavedUnlockKeysPanel extends JPanel
 			: selected.getLastUsedAt() == null
 				? "Not copied yet"
 				: "Copied " + dateFormat.format(selected.getLastUsedAt()));
+		StringBuilder history = new StringBuilder();
+		if (present)
+		{
+			List<SavedUnlockKey.ExitEvent> events = selected.getUnauthorizedEnds();
+			history.append(events.size()).append(events.size() == 1 ? " exit without unlocking" : " exits without unlocking");
+			for (int index = events.size() - 1; index >= 0; index--)
+			{
+				history.append("\n").append(index + 1).append(". ")
+					.append(dateFormat.format(events.get(index).getOccurredAt()));
+			}
+		}
+		exitNotice.setText(history.toString());
+		exitNotice.setCaretPosition(0);
 		note.setText(!present
 			? ""
 			: selected.getNote().isEmpty() ? "No note" : selected.getNote());
 		note.setCaretPosition(0);
-		copyButton.setEnabled(present);
+		copyButton.setEnabled(present && !copying);
 		editButton.setEnabled(present);
 		forgetButton.setEnabled(present);
 	}
@@ -290,8 +316,44 @@ final class SavedUnlockKeysPanel extends JPanel
 	private void copySelected()
 	{
 		SavedUnlockKey selected = keyList.getSelectedValue();
-		if (selected == null)
+		if (selected == null || copying) return;
+		if (sessionManager.savedKeysRequireBackgroundThread())
 		{
+			copying = true;
+			copyButton.setEnabled(false);
+			managerStatus.setPlainText("Opening saved unlock key...");
+			new javax.swing.SwingWorker<char[], Void>()
+			{
+				@Override
+				protected char[] doInBackground()
+				{
+					return sessionManager.revealSavedUnlockKey(selected.getId());
+				}
+
+				@Override
+				protected void done()
+				{
+					char[] key = null;
+					try
+					{
+						key = get();
+						clipboard.copyText(new String(key));
+						refresh();
+						managerStatus.setPlainText("Unlock key copied");
+					}
+					catch (Exception failure)
+					{
+						Throwable cause = failure.getCause();
+						showError(cause == null ? failure.getMessage() : cause.getMessage());
+					}
+					finally
+					{
+						if (key != null) Arrays.fill(key, '\0');
+						copying = false;
+						showSelectedKey();
+					}
+				}
+			}.execute();
 			return;
 		}
 		char[] key = null;

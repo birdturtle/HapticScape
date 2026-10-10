@@ -12,14 +12,16 @@ import java.awt.EventQueue;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 
-/** Desktop notification service backed by the operating-system system tray. */
+/** Desktop notifications and tray controls: native D-Bus on Linux, AWT elsewhere. */
 public final class AwtDesktopNotificationService implements DesktopNotificationService, AutoCloseable
 {
 	private final String title;
 	private TrayIcon trayIcon;
 	private boolean unavailable;
+	private LinuxStatusNotifierTray linuxTray;
 
 	public AwtDesktopNotificationService(String title)
 	{
@@ -29,6 +31,12 @@ public final class AwtDesktopNotificationService implements DesktopNotificationS
 	@Override
 	public synchronized void notify(String message)
 	{
+		Objects.requireNonNull(message, "message");
+		if (DesktopPlatform.current() == DesktopPlatform.LINUX)
+		{
+			if (linuxTray != null) linuxTray.notify(message);
+			return;
+		}
 		TrayIcon icon = ensureTrayIcon();
 		if (icon != null)
 		{
@@ -39,13 +47,35 @@ public final class AwtDesktopNotificationService implements DesktopNotificationS
 	/** Installs the persistent tray icon and its application controls. */
 	public synchronized boolean installApplicationMenu(Runnable openAction, Runnable exitAction)
 	{
+		return installApplicationMenu(openAction, exitAction, available -> { });
+	}
+
+	/** Reports native tray-host changes on the Swing event thread. */
+	public synchronized boolean installApplicationMenu(Runnable openAction, Runnable exitAction,
+		Consumer<Boolean> availability)
+	{
 		Objects.requireNonNull(openAction, "openAction");
 		Objects.requireNonNull(exitAction, "exitAction");
-		TrayIcon icon = ensureTrayIcon();
-		if (icon == null)
+		Objects.requireNonNull(availability, "availability");
+		if (DesktopPlatform.current() == DesktopPlatform.LINUX)
 		{
-			return false;
+			if (linuxTray != null) linuxTray.close();
+			try
+			{
+				linuxTray = new LinuxStatusNotifierTray(title, openAction, exitAction, availability);
+				boolean installed = linuxTray.start();
+				if (!installed) { linuxTray.close(); linuxTray = null; }
+				return installed;
+			}
+			catch (RuntimeException | LinkageError unavailable)
+			{
+				if (linuxTray != null) linuxTray.close();
+				linuxTray = null;
+				return false;
+			}
 		}
+		TrayIcon icon = ensureTrayIcon();
+		if (icon == null) return false;
 
 		PopupMenu menu = new PopupMenu();
 		MenuItem open = new MenuItem("Open HapticScape");
@@ -114,6 +144,11 @@ public final class AwtDesktopNotificationService implements DesktopNotificationS
 	@Override
 	public synchronized void close()
 	{
+		if (linuxTray != null)
+		{
+			linuxTray.close();
+			linuxTray = null;
+		}
 		if (trayIcon != null && SystemTray.isSupported())
 		{
 			SystemTray.getSystemTray().remove(trayIcon);

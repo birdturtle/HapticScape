@@ -115,7 +115,7 @@ final class RemoteLockPreparationPanel extends JPanel
 			: "The participant has not allowed protected exit requests");
 		startupBehavior.setEnabled(protectedExit.isEnabled());
 		startupBehavior.setToolTipText(protectedExitAllowed
-			? "Preserve the accepted Start with Windows and minimized settings"
+			? "Preserve the accepted startup and minimized settings"
 			: "The participant has not allowed protected startup requests");
 		requestButton.setEnabled(controllerActive && effectiveCount > 0 && vaultAvailable);
 		requestButton.setToolTipText(vaultAvailable ? null : vaultMessage);

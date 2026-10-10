@@ -2,7 +2,7 @@ package com.ashy0019.hapticscape.music;
 
 import java.util.Objects;
 
-/** One local application currently represented in the Windows audio mixer. */
+/** One local application currently represented in the desktop playback graph. */
 public final class AudioCaptureApplication
 {
 	private final String id;

@@ -107,8 +107,6 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 			runtime.getMusicSyncService()::updateCaptureEndpoint,
 			runtime.getClickerService()::updateSettings,
 			runtime::playClick,
-			runtime.getUpdatePreferencesStore(),
-			runtime.getUpdateCheckService(),
 			runtime.getRemoteSessionManager(),
 			runtime.getRemotePairingService(),
 			runtime.getDiscordPairingBridge(),
@@ -239,7 +237,8 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 					record.getEventId(),
 					record.getControllerId(),
 					record.getOccurredAtMillis(),
-					"Unauthorized end"
+					"Unauthorized end",
+					record.getLockId()
 				);
 		}
 		catch (RuntimeException ignored)
@@ -296,31 +295,6 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 	{
 		restoreFromTray();
 		requestClose();
-	}
-
-	void showUnauthorizedEndWarning(String message)
-	{
-		Runnable showWarning = () ->
-		{
-			frame.setVisible(true);
-			frame.setState(JFrame.NORMAL);
-			frame.toFront();
-			frame.requestFocus();
-			JOptionPane.showMessageDialog(
-				frame,
-				Objects.requireNonNull(message, "message"),
-				"Unauthorized end",
-				JOptionPane.WARNING_MESSAGE
-			);
-		};
-		if (SwingUtilities.isEventDispatchThread())
-		{
-			showWarning.run();
-		}
-		else
-		{
-			SwingUtilities.invokeLater(showWarning);
-		}
 	}
 
 	public DiscordJoinConsentHandler createDiscordJoinConsentHandler()

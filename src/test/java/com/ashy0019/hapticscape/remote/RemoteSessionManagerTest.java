@@ -366,11 +366,15 @@ public class RemoteSessionManagerTest
 		throws Exception
 	{
 		TestRelay relay = new TestRelay();
+		SavedUnlockKeyStore vault = new SavedUnlockKeyStore(new Gson(),
+			temporaryFolder.getRoot().toPath().resolve("audit-vault.json"),
+			new TestUnlockKeyProtector(), Clock.systemUTC());
 		try (RemoteSessionManager controller = new RemoteSessionManager(
 			new Gson(),
 			new MemoryStore(new MutableConfig(20)),
 			new EffectiveSettingsService(new MutableConfig(20)),
 			lockService("audit-controller.json"),
+			vault,
 			relay);
 			RemoteSessionManager participant = new RemoteSessionManager(
 				new Gson(),
@@ -407,18 +411,32 @@ public class RemoteSessionManagerTest
 			await(() -> participant.getPeerClientId().isPresent());
 			String controllerId = participant.getPeerClientId().orElseThrow(AssertionError::new);
 			String eventId = java.util.UUID.randomUUID().toString();
+			String subjectId = controller.getPeerClientId().orElseThrow(AssertionError::new);
+			String lockId = java.util.UUID.randomUUID().toString();
+			vault.saveAcceptedProfileKey(lockId, subjectId,
+				"Subject", "ABCD-EFGH-JKLM-NPQR-STUV".toCharArray());
 
 			assertFalse(participant.reportUnauthorizedEnd(
 				eventId, java.util.UUID.randomUUID().toString(), 1234L, "wrong target"));
 			assertTrue(participant.reportUnauthorizedEnd(
-				eventId, controllerId, 1234L, "Unauthorized end"));
+				eventId, controllerId, 1234L, "Unauthorized end", lockId));
 			assertTrue(participant.reportUnauthorizedEnd(
-				eventId, controllerId, 1234L, "Unauthorized end"));
+				eventId, controllerId, 1234L, "Unauthorized end", lockId));
 
 			await(() -> received.size() == 1 && acknowledged.size() == 2);
 			assertEquals(Collections.singletonList("Unauthorized end"), received);
 			assertEquals(2, acknowledged.size());
 			assertEquals(eventId, acknowledged.get(0));
+			assertEquals(java.time.Instant.ofEpochMilli(1234L),
+				vault.list().get(0).getLastUnauthorizedEndAt());
+			String secondEvent = java.util.UUID.randomUUID().toString();
+			assertTrue(participant.reportUnauthorizedEnd(
+				secondEvent, controllerId, 2345L, "Unauthorized end", lockId));
+			await(() -> vault.list().get(0).getUnauthorizedEnds().size() == 2);
+			assertTrue(participant.reportUnauthorizedEnd(
+				secondEvent, controllerId, 2345L, "Unauthorized end", lockId));
+			await(() -> acknowledged.size() == 4);
+			assertEquals(2, vault.list().get(0).getUnauthorizedEnds().size());
 		}
 	}
 
@@ -799,6 +817,39 @@ public class RemoteSessionManagerTest
 			java.util.Arrays.fill(firstKey, '\0');
 			java.util.Arrays.fill(secondKey, '\0');
 		}
+	}
+
+	@Test(timeout = 15000)
+	public void acceptedKeyWalletPromptDoesNotBlockRemoteSessionActions() throws Exception
+	{
+		Gson gson = new Gson();
+		TestRelay relay = new TestRelay();
+		MutableConfig controllerConfig = new MutableConfig(20);
+		MutableConfig participantConfig = new MutableConfig(60);
+		BlockingSecretProtector protector = new BlockingSecretProtector(new TestUnlockKeyProtector());
+		protector.blockProtect = true;
+		SavedUnlockKeyStore vault = new SavedUnlockKeyStore(gson,
+			temporaryFolder.getRoot().toPath().resolve("background-vault.json"), protector, Clock.systemUTC());
+		try (RemoteSessionManager controller = new RemoteSessionManager(gson,
+			new MemoryStore(controllerConfig), new EffectiveSettingsService(controllerConfig),
+			lockService("background-controller.json"), vault, relay);
+			RemoteSessionManager participant = new RemoteSessionManager(gson,
+				new MemoryStore(participantConfig), new EffectiveSettingsService(participantConfig),
+				lockService("background-participant.json"), relay))
+		{
+			participant.joinParticipant(controller.startController("wss://relay.example/relay").encode());
+			awaitActive(controller, participant);
+			controller.proposeSettingsLock("ABCD-EFGH-JKLM-NPQR-STUV".toCharArray());
+			participant.acceptPendingSettingsLock();
+			assertTrue(protector.entered.await(2, TimeUnit.SECONDS));
+			assertFalse(java.util.concurrent.CompletableFuture.supplyAsync(controller::canReconnect)
+				.get(1, TimeUnit.SECONDS));
+			assertTrue(vault.list().isEmpty());
+			protector.release.countDown();
+			await(() -> vault.list().size() == 1);
+			await(() -> controller.getLockSnapshot().getMessage().contains("unlock key saved"));
+		}
+		finally { protector.release.countDown(); }
 	}
 
 	private SettingsLockService lockService(String name)

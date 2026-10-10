@@ -28,7 +28,7 @@ public class SettingsBackedHapticScapeSettingsTest
         assertEquals("ATTACK,COOKING", settings.clickerDisabledSkills());
         assertEquals(HapticScapeSettingsSource.DEFAULT_REMOTE_RELAY_URL, settings.remoteRelayUrl());
 		assertEquals("", settings.musicCaptureEndpointId());
-		assertEquals("Default Windows output", settings.musicCaptureEndpointName());
+        assertEquals("Default system output", settings.musicCaptureEndpointName());
 		assertEquals("OUTPUT", settings.musicCaptureMode());
 		assertEquals("", settings.musicCaptureApplicationId());
         assertTrue(settings.remoteSettingsAllowed());

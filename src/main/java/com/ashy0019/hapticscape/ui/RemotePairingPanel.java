@@ -69,6 +69,7 @@ final class RemotePairingPanel extends JPanel
 	private final JButton installDiscordButton = new JButton("Install Discord app");
 	private final JButton linkDiscordButton = new JButton("Link Discord");
 	private final JButton unlinkDiscordButton = new JButton("Unlink");
+	private final JButton retryDiscordButton = new JButton("Retry saved link");
 	private final JPanel viewHost = new JPanel(new BorderLayout());
 	private final JPanel connectView = new JPanel();
 	private final JPanel waitingView = new JPanel();
@@ -255,7 +256,13 @@ final class RemotePairingPanel extends JPanel
 		JPanel statusRow = new JPanel(new BorderLayout(8, 0));
 		statusRow.add(discordStatus, BorderLayout.CENTER);
 		configureCompactButton(unlinkDiscordButton);
-		statusRow.add(unlinkDiscordButton, BorderLayout.EAST);
+		configureCompactButton(retryDiscordButton);
+		retryDiscordButton.setName("remoteDiscordRetry");
+		retryDiscordButton.addActionListener(event -> discordPairingBridge.retryStoredLink());
+		JPanel linkActions = new JPanel(new GridLayout(1, 2, 4, 0));
+		linkActions.add(retryDiscordButton);
+		linkActions.add(unlinkDiscordButton);
+		statusRow.add(linkActions, BorderLayout.EAST);
 		allowHorizontalShrink(statusRow);
 		PanelUi.addPreferredHeightComponent(discordPanel, statusRow);
 
@@ -422,6 +429,9 @@ final class RemotePairingPanel extends JPanel
 		boolean available = snapshot.getState() != DiscordLinkState.UNAVAILABLE;
 		discordLinkSetup.setVisible(showsDiscordSetup(snapshot.getState()));
 		unlinkDiscordButton.setVisible(showsDiscordUnlink(snapshot.getState()));
+		retryDiscordButton.setVisible(snapshot.getState() == DiscordLinkState.UNAVAILABLE
+			&& discordPairingBridge.canRetryStoredLink());
+		retryDiscordButton.setEnabled(currentSessionLocal && !linking);
 		installDiscordButton.setEnabled(currentSessionLocal && available);
 		discordLinkCode.setEnabled(currentSessionLocal && available && !linked && !linking);
 		linkDiscordButton.setEnabled(

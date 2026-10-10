@@ -13,6 +13,7 @@ final class UnauthorizedEndNotice
 	private final String controllerId;
 	private final long occurredAtMillis;
 	private final String reason;
+	private String lockId;
 
 	UnauthorizedEndNotice(
 		String eventId,
@@ -23,6 +24,7 @@ final class UnauthorizedEndNotice
 		this.schemaVersion = SCHEMA_VERSION;
 		this.eventId = requireUuid(eventId, "eventId");
 		this.controllerId = requireUuid(controllerId, "controllerId");
+		if (lockId != null) requireUuid(lockId, "lockId");
 		if (occurredAtMillis <= 0)
 		{
 			throw new IllegalArgumentException("occurredAtMillis must be positive");
@@ -32,6 +34,14 @@ final class UnauthorizedEndNotice
 		this.reason = normalizedReason.isEmpty() ? "Unauthorized end" : normalizedReason;
 	}
 
+	UnauthorizedEndNotice(String eventId, String controllerId, long occurredAtMillis, String reason, String lockId)
+	{
+		this(eventId, controllerId, occurredAtMillis, reason);
+		this.lockId = lockId == null ? null : requireUuid(lockId, "lockId");
+	}
+
+	String getLockId() { return lockId; }
+
 	void validate()
 	{
 		if (schemaVersion != SCHEMA_VERSION)
@@ -40,6 +50,7 @@ final class UnauthorizedEndNotice
 		}
 		requireUuid(eventId, "eventId");
 		requireUuid(controllerId, "controllerId");
+		if (lockId != null) requireUuid(lockId, "lockId");
 		if (occurredAtMillis <= 0 || reason == null || reason.trim().isEmpty())
 		{
 			throw new IllegalArgumentException("Invalid unauthorized-end notice");
@@ -54,6 +65,11 @@ final class UnauthorizedEndNotice
 	String getControllerId()
 	{
 		return controllerId;
+	}
+
+	long getOccurredAtMillis()
+	{
+		return occurredAtMillis;
 	}
 
 	String getReason()

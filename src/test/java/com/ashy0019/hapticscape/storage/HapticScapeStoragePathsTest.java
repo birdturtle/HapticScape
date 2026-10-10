@@ -18,6 +18,5 @@ public class HapticScapeStoragePathsTest
 		assertEquals(root.resolve("saved-unlock-keys.json"), paths.getSavedUnlockKeysPath());
 		assertEquals(root.resolve("settings-lock.json"), paths.getSettingsLockPath());
 		assertEquals(root.resolve("discord-device.json"), paths.getDiscordCredentialPath());
-		assertEquals(root.resolve("updater-settings.json"), paths.getUpdaterPreferencesPath());
 	}
 }

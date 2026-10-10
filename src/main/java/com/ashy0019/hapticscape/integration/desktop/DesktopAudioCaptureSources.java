@@ -17,44 +17,93 @@ public final class DesktopAudioCaptureSources
 	/** Returns a capture source for the desktop system-output stream. */
 	public static AudioCaptureSource systemOutput()
 	{
-		return new WasapiLoopbackCapture();
+		return systemOutput(AudioCaptureEndpoint.systemDefault());
 	}
 
-	/** Returns a capture source for the selected Windows render endpoint. */
+	/** Returns a capture source for the selected desktop output endpoint. */
 	public static AudioCaptureSource systemOutput(AudioCaptureEndpoint endpoint)
 	{
-		return new WasapiLoopbackCapture(endpoint);
+		return systemOutput(DesktopPlatform.current(), endpoint);
 	}
 
-	/** Lists active Windows render endpoints without applying vendor-specific rules. */
+	/** Lists active capture outputs for the current desktop platform. */
 	public static AudioCaptureEndpointCatalog endpointCatalog()
 	{
-		return new WasapiAudioEndpointCatalog();
+		return endpointCatalog(DesktopPlatform.current());
 	}
 
-	/** Lists applications exposed by the ordinary Windows audio-session mixer. */
+	/** Lists playback applications for the current desktop platform. */
 	public static AudioCaptureApplicationCatalog applicationCatalog()
 	{
-		return new WasapiAudioApplicationCatalog();
+		return applicationCatalog(DesktopPlatform.current());
 	}
 
 	/** Creates both whole-output and per-application PCM Music Sync sources. */
 	public static AudioCaptureSourceFactory factory()
+	{
+		return factory(DesktopPlatform.current());
+	}
+
+	static AudioCaptureSourceFactory factory(DesktopPlatform platform)
 	{
 		return new AudioCaptureSourceFactory()
 		{
 			@Override
 			public AudioCaptureSource create(AudioCaptureEndpoint endpoint)
 			{
-				return systemOutput(endpoint);
+				return systemOutput(platform, endpoint);
 			}
 
 			@Override
 			public AudioCaptureSource createApplication(
 				AudioCaptureApplication application)
 			{
-				return new WasapiApplicationLoopbackCapture(application);
+				return application(platform, application);
 			}
+		};
+	}
+
+	static AudioCaptureSource systemOutput(DesktopPlatform platform, AudioCaptureEndpoint endpoint)
+	{
+		return platform == DesktopPlatform.WINDOWS
+			? new WasapiLoopbackCapture(endpoint)
+			: platform == DesktopPlatform.LINUX ? new PipeWireLoopbackCapture(endpoint) : unavailable(platform);
+	}
+
+	static AudioCaptureSource application(DesktopPlatform platform, AudioCaptureApplication application)
+	{
+		return platform == DesktopPlatform.WINDOWS
+			? new WasapiApplicationLoopbackCapture(application)
+			: platform == DesktopPlatform.LINUX ? new PipeWireApplicationCapture(application) : unavailable(platform);
+	}
+
+	static AudioCaptureEndpointCatalog endpointCatalog(DesktopPlatform platform)
+	{
+		return platform == DesktopPlatform.WINDOWS
+			? new WasapiAudioEndpointCatalog()
+			: platform == DesktopPlatform.LINUX ? new PipeWireAudioEndpointCatalog() : java.util.Collections::emptyList;
+	}
+
+	static AudioCaptureApplicationCatalog applicationCatalog(DesktopPlatform platform)
+	{
+		return platform == DesktopPlatform.WINDOWS
+			? new WasapiAudioApplicationCatalog()
+			: platform == DesktopPlatform.LINUX ? new PipeWireAudioApplicationCatalog() : AudioCaptureApplicationCatalog.empty();
+	}
+
+	private static AudioCaptureSource unavailable(DesktopPlatform platform)
+	{
+		String message = "Music Sync capture is unavailable on this platform";
+		return new AudioCaptureSource()
+		{
+			@Override
+			public void start(Listener listener)
+			{
+				throw new UnsupportedOperationException(message);
+			}
+
+			@Override
+			public void close() { }
 		};
 	}
 }

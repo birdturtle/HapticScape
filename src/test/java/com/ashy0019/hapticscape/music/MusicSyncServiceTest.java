@@ -66,6 +66,31 @@ public class MusicSyncServiceTest
 	}
 
 	@Test
+	public void startupFailurePreservesBackendMessageAndStopsOutput()
+	{
+		FakeIntifaceService intiface = new FakeIntifaceService();
+		boolean[] closed = { false };
+		MusicSyncService service = new MusicSyncService(intiface, () -> new AudioCaptureSource()
+		{
+			@Override
+			public void start(Listener listener)
+			{
+				throw new UnsupportedOperationException("Linux PipeWire capture is not implemented yet");
+			}
+
+			@Override
+			public void close() { closed[0] = true; }
+		}, settings(false));
+
+		service.updateSettings(settings(true));
+		assertEquals(MusicSyncSnapshot.State.ERROR, service.getSnapshot().getState());
+		assertEquals("Linux PipeWire capture is not implemented yet", service.getSnapshot().getMessage());
+		assertTrue(closed[0]);
+		assertTrue(intiface.liveStopped);
+		service.close();
+	}
+
+	@Test
 	public void changingEndpointSafelyRestartsActiveCapture()
 	{
 		FakeIntifaceService intiface = new FakeIntifaceService();

@@ -15,7 +15,7 @@ import javax.swing.JPanel;
 /** Local and remotely viewable application startup preferences. */
 final class ApplicationStartupPanel extends JPanel
 {
-	private final JCheckBox launch = new JCheckBox("Start HapticScape with Windows");
+	private final JCheckBox launch = new JCheckBox("Start HapticScape at sign-in");
 	private final JCheckBox minimized = new JCheckBox("Start minimized to the system tray");
 	private final BiConsumer<String, Object> writer;
 	private final BooleanSupplier subjectWorkspace;

@@ -278,7 +278,7 @@ final class RemoteControlPanel extends JPanel implements RemoteSessionListener
 		keyField.setHorizontalAlignment(JTextField.CENTER);
 		WrappedTextLabel explanation = new WrappedTextLabel(
 			"HapticScape will save this unlock key only if the participant accepts "
-				+ "the lock. The saved copy is encrypted by Windows for your account."
+				+ "the lock. The saved copy is encrypted for your account."
 		);
 		JPanel content = new JPanel();
 		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));

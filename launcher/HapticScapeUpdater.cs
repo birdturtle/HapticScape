@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 
 internal static class HapticScapeUpdater
@@ -16,12 +17,24 @@ internal static class HapticScapeUpdater
 		Application.EnableVisualStyles();
 		Application.SetCompatibleTextRenderingDefault(false);
 
+        int result = Run(args, WebViewRuntime.EnsureInstalled, delegate(string message) {
+            MessageBox.Show(message, "HapticScape update failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        });
+        ScheduleSelfDeletion();
+        return result;
+    }
+
+    // Production transaction, exercised with controlled launcher fixtures in CI.
+    internal static int Run(string[] args, Action<string> ensureRuntime, Action<string> reportError)
+    {
+
 		string installDirectory = null;
 		string stagedDirectory = null;
 		string temporaryRoot = null;
 		string backupDirectory = null;
 		bool backupCreated = false;
 		bool newVersionInstalled = false;
+		Process newLauncher = null;
 
 		try
 		{
@@ -39,25 +52,43 @@ internal static class HapticScapeUpdater
 				parentDirectory,
 				"HapticScape-backup-" + Guid.NewGuid().ToString("N"));
 
-			Directory.Move(installDirectory, backupDirectory);
+			// A compatibility bootstrap may still be finishing its WaitForExit
+            // after the native launcher exits. Give its executable lock time to clear.
+            MoveInstallation(installDirectory, backupDirectory);
 			backupCreated = true;
 			Directory.Move(stagedDirectory, installDirectory);
 			newVersionInstalled = true;
 
 			string launcherPath = Path.Combine(installDirectory, "HapticScape.exe");
+			bool unified = File.Exists(Path.Combine(installDirectory, "app", "suite.json"));
+			if (unified) ensureRuntime(installDirectory);
+			string readyPath = Path.Combine(temporaryRoot, "launcher-ready");
+			string readyToken = Guid.NewGuid().ToString("N");
 			ProcessStartInfo startInfo = new ProcessStartInfo();
-			startInfo.FileName = launcherPath;
+			startInfo.FileName = unified
+				? Path.Combine(installDirectory, "launcher", "HapticScapeLauncher.exe") : launcherPath;
+			if (unified) startInfo.Arguments = "--update-ready-file \"" + readyPath + "\" --update-ready-token " + readyToken;
 			startInfo.WorkingDirectory = installDirectory;
 			startInfo.UseShellExecute = false;
-			Process.Start(startInfo);
+			newLauncher = Process.Start(startInfo);
+			if (unified) LauncherStartupValidation.WaitForReady(newLauncher, readyPath, readyToken, 90000);
 
 			TryDeleteDirectory(backupDirectory);
 			TryDeleteDirectory(temporaryRoot);
-			ScheduleSelfDeletion();
 			return 0;
 		}
 		catch (Exception exception)
 		{
+			try
+			{
+				if (newLauncher != null && !newLauncher.HasExited)
+				{
+					// Request ordinary launcher closure. Never kill Java or protected clients.
+					newLauncher.CloseMainWindow();
+					newLauncher.WaitForExit(10000);
+				}
+			}
+			catch (Exception) { /* Preserve the original failure and attempt rollback. */ }
 			TryRollback(
 				installDirectory,
 				stagedDirectory,
@@ -65,16 +96,20 @@ internal static class HapticScapeUpdater
 				backupCreated,
 				newVersionInstalled);
 			TryLaunchExisting(installDirectory);
-			MessageBox.Show(
-				"HapticScape could not finish installing the update. The previous version was restored when possible.\n\n"
-					+ exception.Message,
-				"HapticScape update failed",
-				MessageBoxButtons.OK,
-				MessageBoxIcon.Error);
-			ScheduleSelfDeletion();
+            reportError("HapticScape could not finish installing the update. The previous version was restored when possible.\n\n" + exception.Message);
 			return 1;
 		}
 	}
+
+    private static void MoveInstallation(string source, string target)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        while (true)
+        {
+            try { Directory.Move(source, target); return; }
+            catch (IOException) { if (timer.ElapsedMilliseconds >= 5000) throw; Thread.Sleep(100); }
+        }
+    }
 
 	private static Dictionary<string, string> ParseOptions(string[] args)
 	{

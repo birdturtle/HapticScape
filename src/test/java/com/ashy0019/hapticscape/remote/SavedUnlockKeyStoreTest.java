@@ -25,6 +25,48 @@ public class SavedUnlockKeyStoreTest
 	public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
 	@Test
+	public void exitNoticeSurvivesRestartEditsAndCopyWithoutChangingNotesOrKeys() throws Exception
+	{
+		Path path = temporaryFolder.getRoot().toPath().resolve("exit-notice.json");
+		TestUnlockKeyProtector protector = new TestUnlockKeyProtector();
+		Clock clock = Clock.systemUTC();
+		SavedUnlockKeyStore store = new SavedUnlockKeyStore(new Gson(), path, protector, clock);
+		String subject = java.util.UUID.randomUUID().toString();
+		SavedUnlockKey saved = store.saveAcceptedProfileKey(java.util.UUID.randomUUID().toString(),
+			subject, "Subject", "ABCD-EFGH-JKLM-NPQR-STUV".toCharArray());
+		store.updateDetails(saved.getId(), "My subject", "Keep my note");
+		assertNull(store.list().get(0).getLastUnauthorizedEndAt());
+		assertFalse(store.recordUnauthorizedEnd(java.util.UUID.randomUUID().toString(), 1234L));
+		String first = java.util.UUID.randomUUID().toString();
+		String second = java.util.UUID.randomUUID().toString();
+		assertTrue(store.recordUnauthorizedEnd(subject, saved.getLockId(), first, 2345L));
+		assertTrue(store.recordUnauthorizedEnd(subject, saved.getLockId(), first, 2345L));
+		assertTrue(store.recordUnauthorizedEnd(subject, saved.getLockId(), second, 1234L));
+		assertFalse(store.recordUnauthorizedEnd(subject, java.util.UUID.randomUUID().toString(),
+			java.util.UUID.randomUUID().toString(), 4567L));
+		SavedUnlockKeyStore restarted = new SavedUnlockKeyStore(new Gson(), path, protector, clock);
+		SavedUnlockKey loaded = restarted.list().get(0);
+		assertEquals(Instant.ofEpochMilli(2345L), loaded.getLastUnauthorizedEndAt());
+		assertEquals("Keep my note", loaded.getNote());
+		assertEquals(2, loaded.getUnauthorizedEnds().size());
+		assertEquals(second, loaded.getUnauthorizedEnds().get(0).getEventId());
+		assertEquals(saved.getProtectedKey(), loaded.getProtectedKey());
+		restarted.updateDetails(saved.getId(), "Renamed", "Edited note");
+		char[] key = restarted.reveal(saved.getId());
+		try { assertArrayEquals("ABCD-EFGH-JKLM-NPQR-STUV".toCharArray(), key); }
+		finally { Arrays.fill(key, '\0'); }
+		assertEquals(Instant.ofEpochMilli(2345L), restarted.list().get(0).getLastUnauthorizedEndAt());
+		assertEquals("Edited note", restarted.list().get(0).getNote());
+		assertEquals(1, protector.getProtectCount());
+		restarted.saveAcceptedProfileKey(java.util.UUID.randomUUID().toString(), subject,
+			"New profile", "WXYZ-2345-6789-BCDF-GHJK".toCharArray());
+		assertEquals(1, restarted.list().size());
+		assertNull(restarted.list().get(0).getLastUnauthorizedEndAt());
+		assertTrue(restarted.list().get(0).getUnauthorizedEnds().isEmpty());
+		assertFalse(restarted.recordUnauthorizedEnd(subject, saved.getLockId(), first, 2345L));
+	}
+
+	@Test
 	public void acceptedKeyIsProtectedEditableAndReadableAfterRestart() throws Exception
 	{
 		Path path = temporaryFolder.getRoot().toPath().resolve("saved-keys.json");

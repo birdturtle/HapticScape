@@ -2,10 +2,15 @@ package com.ashy0019.hapticscape.remote;
 
 import java.time.Instant;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Controller-owned metadata for one DPAPI-protected settings unlock key. */
+/** Controller-owned metadata for one platform-protected settings unlock key. */
 public final class SavedUnlockKey
 {
 	static final int MAXIMUM_LABEL_LENGTH = 80;
@@ -19,6 +24,8 @@ public final class SavedUnlockKey
 	private final long lastUsedAtEpochMillis;
 	private final String note;
 	private final String protectedKey;
+	private long lastUnauthorizedEndEpochMillis;
+	private List<ExitEvent> unauthorizedEnds;
 
 	SavedUnlockKey(
 		String id,
@@ -82,6 +89,55 @@ public final class SavedUnlockKey
 		return note;
 	}
 
+	public Instant getLastUnauthorizedEndAt()
+	{
+		return lastUnauthorizedEndEpochMillis == 0
+			? null : Instant.ofEpochMilli(lastUnauthorizedEndEpochMillis);
+	}
+
+	/** Chronological exit history for this particular lock. */
+	public List<ExitEvent> getUnauthorizedEnds()
+	{
+		if (unauthorizedEnds != null) return Collections.unmodifiableList(unauthorizedEnds);
+		// Preserve the single notice written by the previous build.
+		return lastUnauthorizedEndEpochMillis == 0 ? Collections.emptyList()
+			: Collections.singletonList(new ExitEvent("legacy-" + lastUnauthorizedEndEpochMillis,
+				lastUnauthorizedEndEpochMillis));
+	}
+
+	SavedUnlockKey withUnauthorizedEnd(String eventId, long epochMillis)
+	{
+		SavedUnlockKey updated = withDetails(label, note);
+		List<ExitEvent> events = new ArrayList<>(getUnauthorizedEnds());
+		events.add(new ExitEvent(eventId, epochMillis));
+		events.sort(java.util.Comparator.comparingLong(event -> event.occurredAtEpochMillis));
+		updated.unauthorizedEnds = events;
+		updated.lastUnauthorizedEndEpochMillis = events.get(events.size() - 1).occurredAtEpochMillis;
+		return updated;
+	}
+
+	private SavedUnlockKey retainExitNotice(SavedUnlockKey updated)
+	{
+		updated.lastUnauthorizedEndEpochMillis = lastUnauthorizedEndEpochMillis;
+		updated.unauthorizedEnds = unauthorizedEnds == null ? null : new ArrayList<>(unauthorizedEnds);
+		return updated;
+	}
+
+	public static final class ExitEvent
+	{
+		private final String eventId;
+		private final long occurredAtEpochMillis;
+
+		private ExitEvent(String eventId, long occurredAtEpochMillis)
+		{
+			this.eventId = eventId;
+			this.occurredAtEpochMillis = occurredAtEpochMillis;
+		}
+
+		public String getEventId() { return eventId; }
+		public Instant getOccurredAt() { return Instant.ofEpochMilli(occurredAtEpochMillis); }
+	}
+
 	String getProtectedKey()
 	{
 		return protectedKey;
@@ -89,7 +145,7 @@ public final class SavedUnlockKey
 
 	SavedUnlockKey withDetails(String nextLabel, String nextNote)
 	{
-		return new SavedUnlockKey(
+		return retainExitNotice(new SavedUnlockKey(
 			id,
 			normalizeLabel(nextLabel),
 			lockId,
@@ -98,12 +154,12 @@ public final class SavedUnlockKey
 			lastUsedAtEpochMillis,
 			normalizeNote(nextNote),
 			protectedKey
-		);
+		));
 	}
 
 	SavedUnlockKey withLastUsedAt(long epochMillis)
 	{
-		return new SavedUnlockKey(
+		return retainExitNotice(new SavedUnlockKey(
 			id,
 			label,
 			lockId,
@@ -112,7 +168,7 @@ public final class SavedUnlockKey
 			epochMillis,
 			note,
 			protectedKey
-		);
+		));
 	}
 
 	void validate()
@@ -131,12 +187,21 @@ public final class SavedUnlockKey
 		{
 			throw new IllegalArgumentException("Invalid saved-key note");
 		}
-		if (createdAtEpochMillis <= 0
+		if (lastUnauthorizedEndEpochMillis < 0
+			|| createdAtEpochMillis <= 0
 			|| lastUsedAtEpochMillis < 0
 			|| (lastUsedAtEpochMillis > 0
 				&& lastUsedAtEpochMillis < createdAtEpochMillis))
 		{
 			throw new IllegalArgumentException("Invalid saved-key timestamp");
+		}
+		Set<String> eventIds = new HashSet<>();
+		for (ExitEvent event : getUnauthorizedEnds())
+		{
+			if (event == null || event.eventId == null || event.eventId.isEmpty()
+				|| event.eventId.length() > 80 || event.occurredAtEpochMillis <= 0
+				|| !eventIds.add(event.eventId))
+				throw new IllegalArgumentException("Invalid exit history");
 		}
 		try
 		{

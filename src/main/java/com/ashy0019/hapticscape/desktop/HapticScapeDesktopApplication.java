@@ -127,19 +127,27 @@ public final class HapticScapeDesktopApplication implements AutoCloseable
 				.isLocked(SettingsLockCatalog.PROTECTED_EXIT);
 			protectedExitAudit.beginRun(
 				protectedExitActive,
-				protectedExitOwner()
+				protectedExitOwner(),
+				protectedExitLockId()
 			);
 			runtime.getSettingsLockService().addListener(snapshot ->
 				protectedExitAudit.setProtectionActive(
 					snapshot.isLocked(SettingsLockCatalog.PROTECTED_EXIT),
-					protectedExitOwner()
+					protectedExitOwner(),
+					protectedExitLockId()
 				)
 			);
 			wireProtectedExitAudit();
 			createWindow(settings, skillCatalog, settingsStore, sourceMessages);
 			boolean trayInstalled = desktopNotifications.installApplicationMenu(
 				window::restoreFromTray,
-				window::requestCloseFromTray
+				window::requestCloseFromTray,
+				available ->
+				{
+					if (closed.get()) return;
+					window.setTrayAvailable(available);
+					if (!available) window.restoreFromTray();
+				}
 			);
 			window.setTrayAvailable(trayInstalled);
 			if (!launchOptions.isMinimized() || !trayInstalled)
@@ -175,17 +183,6 @@ public final class HapticScapeDesktopApplication implements AutoCloseable
 				protectedExitAudit.clearPendingUnauthorizedEnd(eventId);
 			}
 
-			@Override
-			public void onUnauthorizedEnd(String reason)
-			{
-				String message = "The participant exited without the protected-exit password.";
-				desktopNotifications.notify("Unauthorized end: " + message);
-				HapticScapeDesktopWindow currentWindow = window;
-				if (currentWindow != null)
-				{
-					currentWindow.showUnauthorizedEndWarning(message);
-				}
-			}
 		});
 	}
 
@@ -196,14 +193,22 @@ public final class HapticScapeDesktopApplication implements AutoCloseable
 			.orElse(null);
 	}
 
+	private String protectedExitLockId()
+	{
+		String owner = protectedExitOwner();
+		return owner == null ? null : runtime.getSettingsLockService().getProfileForOwner(owner)
+			.map(profile -> profile.getProposalId()).orElse(null);
+	}
+
 	private void tryReportPendingUnauthorizedEnd()
 	{
-		protectedExitAudit.getPendingUnauthorizedEnd().ifPresent(record ->
+		protectedExitAudit.getPendingUnauthorizedEnds().forEach(record ->
 			runtime.getRemoteSessionManager().reportUnauthorizedEnd(
 				record.getEventId(),
 				record.getControllerId(),
 				record.getOccurredAtMillis(),
-				"Unauthorized end"
+				"Unauthorized end",
+				record.getLockId()
 			)
 		);
 	}

@@ -1,6 +1,7 @@
 package com.ashy0019.hapticscape.desktop;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.file.Path;
@@ -15,6 +16,45 @@ public class ProtectedExitAuditStoreTest
 {
 	@Rule
 	public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+	@Test
+	public void multipleOfflineExitsRemainPendingUntilEachIsAcknowledged() throws Exception
+	{
+		Path path = temporaryFolder.getRoot().toPath().resolve("queued-audit.properties");
+		String controller = UUID.randomUUID().toString();
+		String lock = UUID.randomUUID().toString();
+		ProtectedExitAuditStore first = new ProtectedExitAuditStore(path);
+		first.beginRun(true, controller, lock);
+		String firstId = first.markUnauthorizedEnd(controller).getEventId();
+		ProtectedExitAuditStore second = new ProtectedExitAuditStore(path);
+		second.beginRun(true, controller, lock);
+		String secondId = second.markUnauthorizedEnd(controller).getEventId();
+		ProtectedExitAuditStore restarted = new ProtectedExitAuditStore(path);
+		assertEquals(2, restarted.getPendingUnauthorizedEnds().size());
+		assertEquals(lock, restarted.getPendingUnauthorizedEnds().get(0).getLockId());
+		assertTrue(restarted.clearPendingUnauthorizedEnd(secondId));
+		assertTrue(restarted.hasPendingUnauthorizedEnd());
+		assertEquals(1, new ProtectedExitAuditStore(path).getPendingUnauthorizedEnds().size());
+		assertTrue(restarted.clearPendingUnauthorizedEnd(firstId));
+		assertFalse(restarted.hasPendingUnauthorizedEnd());
+		assertTrue(new ProtectedExitAuditStore(path).getPendingUnauthorizedEnds().isEmpty());
+	}
+
+	@Test
+	public void pendingExitRetainsItsOriginalLockAcrossRestart() throws Exception
+	{
+		java.nio.file.Path path = temporaryFolder.getRoot().toPath().resolve("lock-audit.properties");
+		String controller = java.util.UUID.randomUUID().toString();
+		String lock = java.util.UUID.randomUUID().toString();
+		ProtectedExitAuditStore store = new ProtectedExitAuditStore(path);
+		store.beginRun(true, controller, lock);
+		ProtectedExitAuditStore restarted = new ProtectedExitAuditStore(path);
+		restarted.beginRun(true, controller, java.util.UUID.randomUUID().toString());
+		assertEquals(lock, restarted.getPendingUnauthorizedEnd().get().getLockId());
+		assertEquals(controller, restarted.getPendingUnauthorizedEnd().get().getControllerId());
+		ProtectedExitAuditStore reloaded = new ProtectedExitAuditStore(path);
+		assertEquals(lock, reloaded.getPendingUnauthorizedEnd().get().getLockId());
+	}
 
 	@Test
 	public void unclearedRunBecomesPendingUnauthorizedEnd()

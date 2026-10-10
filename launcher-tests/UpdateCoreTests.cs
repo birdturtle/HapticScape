@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Threading;
 
@@ -13,6 +14,7 @@ internal static class UpdateCoreTests
 		Directory.CreateDirectory(root);
 		try
 		{
+			TestStartupConfirmation(root);
 			TestVersions();
 			TestDeepLinks();
 			TestDeepLinkHandoff(root);
@@ -40,6 +42,37 @@ internal static class UpdateCoreTests
 			UpdatePackagePreparer.TryDeleteDirectory(root);
 		}
 	}
+
+    private static void TestStartupConfirmation(string root)
+    {
+        string marker = Path.Combine(root, "launcher-ready");
+        Assert(!LauncherStartupValidation.IsReady(marker, "expected"), "missing startup acknowledgement is rejected");
+        File.WriteAllText(marker, "partial");
+        Assert(!LauncherStartupValidation.IsReady(marker, "expected"), "wrong startup acknowledgement is rejected");
+        File.WriteAllText(marker, "expected");
+        Assert(LauncherStartupValidation.IsReady(marker, "expected"), "exact startup acknowledgement is accepted");
+        using (Process live = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 6 127.0.0.1 >nul") { UseShellExecute = false, CreateNoWindow = true }))
+        {
+            try
+            {
+                LauncherStartupValidation.WaitForReady(live, marker, "expected", 1000);
+                Assert(true, "a live launcher with the correct acknowledgement is accepted");
+                bool timedOut = false;
+                try { LauncherStartupValidation.WaitForReady(live, marker, "wrong", 150); }
+                catch (TimeoutException) { timedOut = true; }
+                Assert(timedOut, "a launcher without the matching acknowledgement times out");
+            }
+            finally { if (!live.HasExited) live.Kill(); live.WaitForExit(); }
+        }
+        using (Process exited = Process.Start(new ProcessStartInfo("cmd.exe", "/c exit 0") { UseShellExecute = false, CreateNoWindow = true }))
+        {
+            exited.WaitForExit();
+            bool rejected = false;
+            try { LauncherStartupValidation.WaitForReady(exited, marker, "expected", 1000); }
+            catch (InvalidOperationException) { rejected = true; }
+            Assert(rejected, "an exited launcher is rejected even if its acknowledgement exists");
+        }
+    }
 
 	private static void TestLaunchOptions()
 	{
@@ -300,6 +333,16 @@ internal static class UpdateCoreTests
 			"3.x installs should be accepted as an update source");
 		Assert(ApplicationLayoutValidation.IsValidStagedApplication(standalone),
 			"complete 3.x layouts should be accepted for installation");
+
+        File.WriteAllText(Path.Combine(standalone, "app", "suite.json"), "{}");
+        Assert(!ApplicationLayoutValidation.IsValidStagedApplication(standalone), "a suite marker cannot hide missing launcher components");
+        Directory.CreateDirectory(Path.Combine(standalone, "launcher"));
+        Directory.CreateDirectory(Path.Combine(standalone, "LumBridge", "app"));
+        foreach (string name in new[] { "HapticScapeLauncher.exe", "MicrosoftEdgeWebview2Setup.exe" })
+            File.WriteAllText(Path.Combine(standalone, "launcher", name), "stub");
+        File.WriteAllText(Path.Combine(standalone, "HapticScapeLegacy.exe"), "stub");
+        File.WriteAllText(Path.Combine(standalone, "LumBridge", "app", "lumbridge.jar"), "stub");
+        Assert(ApplicationLayoutValidation.IsValidStagedApplication(standalone), "a complete suite retains the historical accepted layout");
 
 		File.Delete(Path.Combine(standalone, "runtime", "bin", "javaw.exe"));
 		Assert(!ApplicationLayoutValidation.IsValidInstalledApplication(standalone),

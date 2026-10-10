@@ -44,6 +44,7 @@ public final class DiscordPairingBridge implements AutoCloseable, RemoteSessionL
 	private final SecureRandom random = new SecureRandom();
 	private final AtomicBoolean pairingInProgress = new AtomicBoolean();
 	private final AtomicBoolean joinInProgress = new AtomicBoolean();
+	private final AtomicBoolean credentialRecoveryInProgress = new AtomicBoolean();
 	private final ConcurrentHashMap<String, PrivateKey> pendingJoinKeys =
 		new ConcurrentHashMap<>();
 
@@ -83,16 +84,55 @@ public final class DiscordPairingBridge implements AutoCloseable, RemoteSessionL
 	public synchronized void start()
 	{
 		ensureOpen();
-		if (!credentialStore.isAvailable())
+		sessionManager.addListener(this);
+		if (!credentialStore.isAvailable()) return;
+		if (credentialStore.requiresBackgroundThread())
 		{
+			retryStoredLink();
 			return;
 		}
 		credential = credentialStore.get().orElse(null);
-		sessionManager.addListener(this);
 		if (credential != null)
 		{
 			connectDevice();
 		}
+	}
+
+	/** Explicit recovery retries wallet access without replacing the existing link. */
+	public CompletableFuture<Void> retryStoredLink()
+	{
+		ensureOpen();
+		if (!credentialRecoveryInProgress.compareAndSet(false, true))
+			return CompletableFuture.completedFuture(null);
+		publish(new DiscordLinkSnapshot(DiscordLinkState.CONNECTING, "", "Opening saved Discord link..."));
+		return CompletableFuture.runAsync(() ->
+		{
+			try
+			{
+				DiscordDeviceCredential restored = credentialStore.get().orElse(null);
+				synchronized (this)
+				{
+					if (closed) return;
+					credential = restored;
+					if (restored != null) connectDevice();
+					else publish(unlinkedSnapshot());
+				}
+			}
+			catch (RuntimeException failure)
+			{
+				if (!closed) publish(new DiscordLinkSnapshot(DiscordLinkState.UNAVAILABLE, "", failure.getMessage()));
+				throw failure;
+			}
+			finally
+			{
+				credentialRecoveryInProgress.set(false);
+			}
+		}, scheduler);
+	}
+
+	public boolean canRetryStoredLink()
+	{
+		return !closed && credentialStore.requiresBackgroundThread() && credentialStore.hasPendingCredential();
 	}
 
 	public DiscordLinkSnapshot getSnapshot()
@@ -242,6 +282,22 @@ public final class DiscordPairingBridge implements AutoCloseable, RemoteSessionL
 	public CompletableFuture<DiscordLinkSnapshot> link(
 		String relayUrl,
 		String encodedLinkCode)
+	{
+		ensureOpen();
+		if (credentialStore.requiresBackgroundThread())
+		{
+			return CompletableFuture.supplyAsync(() ->
+			{
+				// A skipped or cancelled wallet load must never turn into a new link.
+				if (credentialStore.get().isPresent())
+					throw new IllegalStateException("Open the saved Discord link before linking another account");
+				return linkLoaded(relayUrl, encodedLinkCode);
+			}, scheduler).thenCompose(result -> result);
+		}
+		return linkLoaded(relayUrl, encodedLinkCode);
+	}
+
+	private CompletableFuture<DiscordLinkSnapshot> linkLoaded(String relayUrl, String encodedLinkCode)
 	{
 		ensureOpen();
 		if (!credentialStore.isAvailable())

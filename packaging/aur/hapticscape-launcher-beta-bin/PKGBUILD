@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Maintainer: birdturtle <321293670+birdturtle@users.noreply.github.com>
+pkgname=hapticscape-launcher-beta-bin
+pkgver=3.2.0rc2
+pkgrel=1
+pkgdesc='HapticScape and LumBridge launcher with managed app downloads (prerelease)'
+arch=('x86_64')
+url='https://github.com/birdturtle/HapticScape'
+license=('BSD-2-Clause')
+depends=('webkit2gtk-4.1' 'gtk3' 'libsecret' 'libayatana-appindicator'
+         'libx11' 'libxext' 'libxi' 'libxrender' 'libxtst' 'fontconfig' 'alsa-lib')
+optdepends=('pipewire: music capture'
+            'gnome-keyring: Secret Service wallet (or an existing compatible wallet)'
+            'intiface-central-bin: device connection and haptic output'
+            'intiface-central: source-built alternative for haptic output')
+provides=('hapticscape-launcher')
+conflicts=('hapticscape-launcher' 'hapticscape-launcher-bin')
+options=('!strip' '!debug')
+_release=3.2.0-rc.2
+source=("HapticScape-Linux-x64-${_release}.run::${url}/releases/download/v${_release}/HapticScape-Linux-x64-${_release}.run")
+noextract=("HapticScape-Linux-x64-${_release}.run")
+sha256sums=('8602e793ec6d0d6e2de74160d918758a20596f5ae104d5345ab1bb86dc392306')
+
+prepare() {
+    # Extract the checksum-pinned launcher payload without executing its installer.
+    local archive="$srcdir/HapticScape-Linux-x64-${_release}.run"
+    local line
+    line=$(awk '/^__HAPTICSCAPE_ARCHIVE__$/ {print NR + 1; exit}' "$archive")
+    [[ $line =~ ^[0-9]+$ ]] || return 1
+    mkdir -p "$srcdir/launcher-payload"
+    tail -n +"$line" "$archive" | tar -xz -C "$srcdir/launcher-payload"
+}
+
+package() {
+    local payload="$srcdir/launcher-payload/HapticScape"
+    install -Dm755 "$payload/launcher/hapticscape-launcher" "$pkgdir/opt/hapticscape/launcher/hapticscape-launcher"
+    for manifest in release suite bootstrap; do
+        install -Dm644 "$payload/app/$manifest.json" "$pkgdir/opt/hapticscape/app/$manifest.json"
+    done
+    install -Dm644 "$payload/icon.png" "$pkgdir/opt/hapticscape/icon.png"
+    install -Dm644 "$payload/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/com.hapticscape.launcher.suite.png"
+    install -Dm644 "$payload/licenses/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "$payload/licenses/launcher-assets.md" "$pkgdir/usr/share/licenses/$pkgname/launcher-assets.md"
+    install -dm755 "$pkgdir/usr/bin" "$pkgdir/usr/share/applications"
+    ln -s /opt/hapticscape/launcher/hapticscape-launcher "$pkgdir/usr/bin/hapticscape-launcher"
+    cat > "$pkgdir/usr/share/applications/com.hapticscape.launcher.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=HapticScape Launcher
+Exec=/opt/hapticscape/launcher/hapticscape-launcher %u
+MimeType=x-scheme-handler/hapticscape;
+Icon=/opt/hapticscape/icon.png
+StartupWMClass=com.hapticscape.launcher
+Terminal=false
+Categories=Game;Utility;
+DESKTOP
+}

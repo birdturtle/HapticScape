@@ -79,7 +79,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build both release ZIPs
+      - name: Set up Node for the launcher
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Rust for the launcher
+        run: rustup update stable
+
+      - name: Test Windows migration and rollback transactions
+        shell: pwsh
+        run: .\launcher-tests\test-migration.ps1
+
+      - name: Build launcher installer and update payload
         shell: pwsh
         env:
           RELEASE_REF_TYPE: ${{ github.ref_type }}
@@ -92,11 +104,72 @@ jobs:
             }
             $version = $Matches[1]
           }
-          .\package-all.ps1 -Version $version
+          .\package-all.ps1 -Version $version -UnifiedLauncher
+
+      - name: Verify Windows update archive
+        shell: pwsh
+        run: |
+          $suite = Get-ChildItem build/distribution/HapticScape-Suite-*.json | Select-Object -First 1
+          $env:HAPTICSCAPE_UPDATE_VERSION = (Get-Content $suite.FullName | ConvertFrom-Json).version
+          $env:HAPTICSCAPE_UPDATE_ARCHIVE = (Get-ChildItem build/distribution/HapticScape-Windows-*.zip | Select-Object -First 1).FullName
+          cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
+          if ($LASTEXITCODE -ne 0) { throw 'Windows update archive verification failed.' }
 
       - name: Upload Windows package candidates
         uses: actions/upload-artifact@v4
         with:
           name: hapticscape-windows-packages-${{ github.sha }}
-          path: build/distribution/*.zip*
+          path: |
+            build/distribution/HapticScape-Windows-*.zip*
+            build/distribution/HapticScape-Launcher-Windows-*.exe*
+            build/distribution/HapticScape-Suite-*.json
+          retention-days: 7
+
+  package-linux:
+    name: Package Linux launcher
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install launcher build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libayatana-appindicator3-dev libwebkit2gtk-4.1-dev libgtk-3-dev libsecret-1-dev librsvg2-dev libssl-dev libdbus-1-dev pkg-config patchelf xvfb xauth
+      - name: Set up Rust
+        run: rustup update stable
+      - name: Test per-user installation and upgrade
+        run: python3 packaging/linux/test-install.py
+      - name: Build Linux packages
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=0.0.0-ci
+          if [ "$RELEASE_REF_TYPE" = tag ]; then version="${RELEASE_REF_NAME#v}"; fi
+          bash package-linux.sh "$version"
+      - name: Verify Linux update archive
+        run: |
+          export HAPTICSCAPE_UPDATE_VERSION=$(python3 -c 'import glob,json; print(json.load(open(glob.glob("build/distribution/HapticScape-Suite-*.json")[0]))["version"])')
+          export HAPTICSCAPE_UPDATE_ARCHIVE=$(realpath build/distribution/HapticScape-Linux-x64-*.tar.gz)
+          cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
+      - name: Test installed Linux package startup
+        run: python3 packaging/linux/test-package.py build/distribution/HapticScape-Linux-x64-*.run
+      - name: Test packaged Linux update and rollback
+        run: python3 packaging/linux/test-update.py build/distribution/HapticScape-Linux-x64-*.run
+      - name: Upload Linux package candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: hapticscape-linux-packages-${{ github.sha }}
+          path: |
+            build/distribution/HapticScape-Suite-*.json
+            build/distribution/*.run*
+            build/distribution/*.tar.gz*
+            build/distribution/*.deb*
           retention-days: 7
