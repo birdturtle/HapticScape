@@ -11,17 +11,14 @@ Prebuilt releases support Windows 10 and newer and x86_64 Linux.
 
  <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/580678a7-47d7-4c2c-8fd1-048a0f7a1a6c" />
 
-## 3.2.0
-
+## New Features
 - Unified launcher for HapticScape, LumBridge and updates.
 - Windows and Linux launcher installers with automatic app downloads.
 - Jagex sign-in with saved accounts and automatic session renewal.
 - Linux system and application audio capture through PipeWire.
-- Music feedback stops when playback pauses or the system is muted.
 - Encrypted remote pairing and saved unlock keys on Linux.
 - Persistent exit-without-unlocking history in saved subject profiles.
 - Connection links on Windows and Linux.
-- Launcher tray controls and optional hide to tray after Play.
 
 ## HapticScape 3 components
 
@@ -82,28 +79,6 @@ Download the `.deb` from the release page and install it:
 ```sh
 sudo apt install ./hapticscape-launcher_3.2.0_amd64.deb
 ```
-
-### Arch / CachyOS (AUR)
-
-Install with yay or paru:
-
-```sh
-yay -S hapticscape-launcher-bin
-```
-
-```sh
-paru -S hapticscape-launcher-bin
-```
-
-For optional Intiface setup, run the helper as your normal user:
-
-```sh
-git clone https://github.com/birdturtle/HapticScape.git
-cd HapticScape
-bash packaging/aur/setup-intiface.sh
-```
-
-The helper asks whether to install Intiface and offers the binary or source package.
 
 ## Using the launcher
 
