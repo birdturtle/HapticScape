@@ -68,13 +68,12 @@ select { flex:1; min-width:0; width:100%; background:var(--surface); color:var(-
 .settings-form input { display:block; width:100%; margin-top:6px; padding:8px; border:1px solid var(--border); border-radius:0; background:var(--canvas); color:var(--text); }
 .settings-form small { font-size:11px; }
 .settings-form button { margin-top:4px; }
-.credits { color:var(--muted); font-size:11px; margin-top:20px; max-width:760px; }
-.credits summary { cursor:pointer; }
 .credit-reference { overflow-wrap:anywhere; }
 pre { font:13px/1.7 "Segoe UI",system-ui,sans-serif; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--muted); border-top:1px solid var(--border); padding-top:16px; }
-footer { color:var(--disabled); font-size:11px; padding:10px 24px; background:var(--surface); border-top:1px solid var(--border); }
+footer { display:flex; align-items:center; justify-content:space-between; gap:16px; color:var(--disabled); font-size:11px; padding:10px 24px; background:var(--surface); border-top:1px solid var(--border); }
 .toast { position:fixed; bottom:42px; left:calc(50% + 82px); transform:translateX(-50%); max-width:650px; background:var(--raised); border:1px solid var(--success); padding:12px 18px; box-shadow:0 8px 24px #0008; z-index:10; font-size:13px; }
 .toast.error { border-color:var(--danger); }
+.image-disclaimer { margin-left:auto; color:#606060; text-align:right; white-space:nowrap; }
 @media(max-width:960px) { body { display:block; } .sidebar { position:static; width:auto; flex-direction:row; align-items:center; border-right:0; border-bottom:1px solid var(--border); } .brand { padding:10px 14px; border:0; } .brand img { width:24px; height:26px; } .brand small,.sidebar-bottom { display:none; } nav { display:flex; padding:0; margin-left:auto; height:55px; } .nav-button { border-left:0; border-bottom:2px solid transparent; padding:8px 18px; } .nav-button.active { border-left:0; border-bottom-color:var(--accent); } main { margin-left:0; min-height:calc(100vh - 55px); } .toast { left:50%; } }
 @media(max-width:700px) { .content { padding:16px; } .app-grid { grid-template-columns:1fr; } .launch-content { padding:18px; } .launch-background { background-position:center,center,right -1000px center; } .panel-heading { flex-wrap:wrap; } }
 
