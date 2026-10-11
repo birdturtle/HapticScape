@@ -56,10 +56,18 @@ final class XpSkillsWorkspacePanel extends JPanel
 		return layoutMode;
 	}
 
+	@Override
+	public void doLayout()
+	{
+		reflow();
+		super.doLayout();
+	}
+
 	private void reflow()
 	{
 		int width = getWidth();
-		int desired = layoutModeForWidth(width);
+		int desired = layoutModeForWidth(width, skillsHost.getPreferredSize().width,
+			defaultsHost.getPreferredSize().width, overrideHost.getPreferredSize().width);
 		if (desired == layoutMode)
 		{
 			return;
@@ -91,7 +99,14 @@ final class XpSkillsWorkspacePanel extends JPanel
 
 	static int layoutModeForWidth(int width)
 	{
-		return width >= WIDE_BREAKPOINT ? 3 : width >= MEDIUM_BREAKPOINT ? 2 : 1;
+		return layoutModeForWidth(width, 360, 360, 360);
+	}
+
+	static int layoutModeForWidth(int width, int skills, int defaults, int overrides)
+	{
+		int wide = Math.max(WIDE_BREAKPOINT, skills + defaults + overrides + 31);
+		int medium = Math.max(MEDIUM_BREAKPOINT, skills + Math.max(defaults, overrides) + 24);
+		return width >= wide ? 3 : width >= medium ? 2 : 1;
 	}
 
 	private void addSection(
@@ -150,6 +165,13 @@ final class XpSkillsWorkspacePanel extends JPanel
 		{
 			Dimension preferred = super.getPreferredSize();
 			return new Dimension(Math.max(preferredWidth, preferred.width), preferred.height);
+		}
+
+		@Override
+		public Dimension getMinimumSize()
+		{
+			Dimension minimum = super.getMinimumSize();
+			return new Dimension(getPreferredSize().width, minimum.height);
 		}
 	}
 }

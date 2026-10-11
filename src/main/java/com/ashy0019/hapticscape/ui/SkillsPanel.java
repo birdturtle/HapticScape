@@ -429,8 +429,12 @@ final class SkillsPanel extends JPanel
 	private static void setOutputColumnWidth(JComponent component)
 	{
 		Dimension preferred = component.getPreferredSize();
-		component.setPreferredSize(new Dimension(96, preferred.height));
-		component.setMinimumSize(new Dimension(96, preferred.height));
+		// GridLayout gives both buttons equal width, including the wider "None" label.
+		int buttonWidth = Math.max(compactButton("All").getPreferredSize().width,
+			compactButton("None").getPreferredSize().width);
+		int width = Math.max(96, 2 * buttonWidth + 2);
+		component.setPreferredSize(new Dimension(width, preferred.height));
+		component.setMinimumSize(new Dimension(width, preferred.height));
 	}
 
 	private static void addCell(
