@@ -1,6 +1,7 @@
 package com.ashy0019.hapticscape;
 
 import com.ashy0019.hapticscape.clicker.ClickSequence;
+import com.ashy0019.hapticscape.clicker.ClickerPhraseRule;
 import com.ashy0019.hapticscape.clicker.ClickerSettings;
 import com.ashy0019.hapticscape.clicker.ClickerService;
 import com.ashy0019.hapticscape.event.XpEvent;
@@ -161,6 +162,13 @@ final class FeedbackCoordinator implements GameplayEventCoordinator.FeedbackSink
 					playback.getDurationMillis()
 				);
 			});
+	}
+
+	@Override
+	public void playPhraseHaptics(ClickerPhraseRule rule)
+	{
+		sendPattern(HapticEventType.PHRASE_TRIGGER, rule.getHapticPattern(), "CHAT_TRIGGER",
+			rule.getIntensityPercent(), rule.getDurationMillis());
 	}
 
 	@Override

@@ -53,7 +53,30 @@ public class ClickerPhraseRulesTest
 			);
 
 		assertEquals(original, restored);
-		assertTrue(original.toConfigValue().startsWith("v3;"));
+		assertTrue(original.toConfigValue().startsWith("v4;"));
+	}
+
+	@Test
+	public void hapticOnlyRulesRoundTripAndMatch()
+	{
+		ClickerPhraseRule rule = new ClickerPhraseRule(true, ClickerPhraseMatchMode.PHRASE, "good job")
+			.withFeedback(ClickSequence.NONE, true, com.ashy0019.hapticscape.HapticPatternSelection.SINGLE, 35, 750);
+		ClickerPhraseRules rules = ClickerPhraseRules.empty().withAdded(rule);
+		assertEquals(rules, ClickerPhraseRules.fromConfigValue(rules.toConfigValue()));
+		assertTrue(rules.matches("Good job!"));
+	}
+
+	@Test
+	public void versionThreePreservesIdentityModeAndClicks()
+	{
+		String id = java.util.UUID.randomUUID().toString();
+		String saved = "v3;" + id + ",1,THREE,CONTAINS,aGVsbG8";
+		ClickerPhraseRule rule = ClickerPhraseRules.fromConfigValue(saved).getRules().get(0);
+		assertEquals(id, rule.getId());
+		assertEquals(ClickSequence.THREE, rule.getSequence());
+		assertEquals(ClickerPhraseMatchMode.CONTAINS, rule.getMode());
+		assertFalse(rule.isHapticEnabled());
+		assertTrue(ClickerPhraseRules.requiresMigration(saved));
 	}
 
 	@Test
@@ -82,21 +105,19 @@ public class ClickerPhraseRulesTest
 	}
 
 	@Test
-	public void versionOneAndTwoRulesMigrateToVersionThreeAsOneClick()
+	public void versionOneAndTwoRulesMigrateWithOneClick()
 	{
 		String legacy = "v1;1,CONTAINS,aGVsbG8";
 		ClickerPhraseRules v1 = ClickerPhraseRules.fromConfigValue(legacy);
-		String v2 = v1.toConfigValue()
-			.replaceFirst("^v3;", "v2;")
-			.replaceFirst(",ONE,", ",");
+		String v2 = "v2;" + v1.getRules().get(0).getId() + ",1,CONTAINS,aGVsbG8";
 		ClickerPhraseRules restoredV2 = ClickerPhraseRules.fromConfigValue(v2);
 
 		assertTrue(ClickerPhraseRules.requiresMigration(legacy));
 		assertTrue(ClickerPhraseRules.requiresMigration(v2));
 		assertEquals(ClickSequence.ONE, v1.getRules().get(0).getSequence());
 		assertEquals(ClickSequence.ONE, restoredV2.getRules().get(0).getSequence());
-		assertTrue(v1.toConfigValue().startsWith("v3;"));
-		assertTrue(restoredV2.toConfigValue().startsWith("v3;"));
+		assertTrue(v1.toConfigValue().startsWith("v4;"));
+		assertTrue(restoredV2.toConfigValue().startsWith("v4;"));
 	}
 
 	@Test

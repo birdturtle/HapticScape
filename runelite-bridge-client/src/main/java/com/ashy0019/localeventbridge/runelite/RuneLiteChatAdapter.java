@@ -16,7 +16,29 @@ public final class RuneLiteChatAdapter
 	public ChatMessageEvent adapt(ChatMessage event)
 	{
 		Objects.requireNonNull(event, "event");
-		return adapt(event.getType(), event.getMessage());
+		return adapt(event, null);
+	}
+
+	public ChatMessageEvent adapt(ChatMessage event, String localPlayerName)
+	{
+		ChatMessageEvent base = adapt(event.getType(), event.getMessage());
+		return new ChatMessageEvent(SOURCE, base.getKind(), base.getRawMessage(),
+			base.getNormalizedMessage(), receivedFromPlayer(event.getType(), event.getName(), localPlayerName));
+	}
+
+	static boolean receivedFromPlayer(ChatMessageType type, String sender, String localPlayerName)
+	{
+		if (type == ChatMessageType.PRIVATECHAT || type == ChatMessageType.MODPRIVATECHAT) return true;
+		switch (type.name())
+		{
+			case "PUBLICCHAT": case "MODCHAT": case "FRIENDSCHAT":
+			case "CLAN_CHAT": case "CLAN_GUEST_CHAT": case "CLAN_GIM_CHAT":
+			case "AUTOTYPER": case "MODAUTOTYPER":
+				String from = normalizeMessage(sender).replace('_', ' ').trim();
+				String own = normalizeMessage(localPlayerName).replace('_', ' ').trim();
+				return !from.isEmpty() && !own.isEmpty() && !from.equalsIgnoreCase(own);
+			default: return false;
+		}
 	}
 
 	ChatMessageEvent adapt(ChatMessageType type, String rawMessage)

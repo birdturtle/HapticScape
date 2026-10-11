@@ -2,7 +2,8 @@ package com.ashy0019.hapticscape.clicker;
 
 public enum ClickerPhraseMatchMode
 {
-	CONTAINS("Contains"),
+	PHRASE("Word or phrase"),
+	CONTAINS("Contains (legacy)"),
 	EXACT("Exact"),
 	REGEX("Regex");
 

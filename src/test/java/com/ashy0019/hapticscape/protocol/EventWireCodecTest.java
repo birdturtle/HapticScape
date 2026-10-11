@@ -24,6 +24,23 @@ public class EventWireCodecTest
 	private final EventWireCodec codec = new EventWireCodec(new Gson());
 
 	@Test
+	public void playerOriginSurvivesWireAndLegacyDefaultsFailClosed()
+	{
+		for (ChatEvent.Kind kind : ChatEvent.Kind.values())
+		{
+			for (boolean incoming : new boolean[] {false, true})
+			{
+				String wire = codec.encode(new ChatEvent("test", kind, "hello", "hello", incoming));
+				assertEquals(incoming, ((ChatEvent) codec.decode(wire)).isReceivedPlayerMessage());
+				JsonObject root = new JsonParser().parse(wire).getAsJsonObject();
+				root.getAsJsonObject("payload").remove("receivedPlayerMessage");
+				assertEquals(kind == ChatEvent.Kind.DIRECT_MESSAGE,
+					((ChatEvent) codec.decode(root.toString())).isReceivedPlayerMessage());
+			}
+		}
+	}
+
+	@Test
 	public void roundTripsEveryEventFamily()
 	{
 		List<HapticScapeEvent> events = Arrays.asList(

@@ -452,7 +452,8 @@ public final class HapticScapePanel extends JPanel
 			settingsLockService,
 			settingsLockDraft,
 			this::isSubjectWorkspaceActive,
-			this::isLockSelectionEnabled
+			this::isLockSelectionEnabled,
+			() -> customPatterns
 		);
 		clickOutputPanel = new ClickOutputPanel(
 			config,
@@ -509,7 +510,7 @@ public final class HapticScapePanel extends JPanel
 		);
 		PanelUi.addCompactTab(tabs, "XP + Skills", xpAndSkills);
 		PanelUi.addCompactTab(tabs, "Alerts", alertsPanel);
-		PanelUi.addCompactTab(tabs, "Phrases", phraseRulesPanel);
+		PanelUi.addCompactTab(tabs, "Chat triggers", phraseRulesPanel);
 		JPanel topPanel = new JPanel();
 		topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
 
@@ -1164,6 +1165,7 @@ public final class HapticScapePanel extends JPanel
 		);
 		profilesPanel.applyCustomPatternLibrary(updatedLibrary);
 		alertsPanel.applyCustomPatternLibrary(updatedLibrary);
+		phraseRulesPanel.refreshPatternChoices();
 
 		updatingPatternSelectors = true;
 		try

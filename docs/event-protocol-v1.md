@@ -50,11 +50,14 @@ limited to 65,536 characters before parsing.
 {
   "kind": "direct_message",
   "rawMessage": "<col=ffffff>Hello</col>",
-  "normalizedMessage": "Hello"
+  "normalizedMessage": "Hello",
+  "receivedPlayerMessage": true
 }
 ```
 
 `kind` is one of `direct_message`, `trade_request`, or `other`.
+
+`receivedPlayerMessage` identifies incoming player chat. LumBridge excludes outgoing and self-authored public, friends, and clan messages, game messages, and messages with unknown sender identity. The field is optional for older bridges: incoming direct messages default to true, other kinds to false. Sender names are not included.
 
 ### `player_death`
 
