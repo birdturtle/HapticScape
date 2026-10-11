@@ -9,6 +9,19 @@ import static org.junit.Assert.assertTrue;
 public class ClickerPhraseRuleTest
 {
 	@Test
+	public void phraseMatchesWholeWordsAndMultipleWords()
+	{
+		ClickerPhraseRule rule = new ClickerPhraseRule(true, ClickerPhraseMatchMode.PHRASE, "good job");
+		assertTrue(rule.matches("Hey, GOOD   JOB!"));
+		assertFalse(rule.matches("good jobs"));
+		assertFalse(rule.matches("ungood job"));
+		ClickerPhraseRule word = new ClickerPhraseRule(true, ClickerPhraseMatchMode.PHRASE, "good");
+		assertTrue(word.matches("good!"));
+		assertFalse(word.matches("goodbye"));
+		assertFalse(word.matches("égood"));
+	}
+
+	@Test
 	public void containsIsCaseInsensitiveAndPartial()
 	{
 		ClickerPhraseRule rule = new ClickerPhraseRule(

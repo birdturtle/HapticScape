@@ -13,6 +13,7 @@ import com.ashy0019.hapticscape.integration.desktop.AwtGlobalUiHooks;
 import com.ashy0019.hapticscape.integration.desktop.AwtTextClipboard;
 import com.ashy0019.hapticscape.integration.desktop.DesktopSourceMessageService;
 import com.ashy0019.hapticscape.integration.desktop.StandaloneLevel99GlassPane;
+import com.ashy0019.hapticscape.integration.desktop.Level99DesktopOverlay;
 import com.ashy0019.hapticscape.remote.DiscordJoinConsentHandler;
 import com.ashy0019.hapticscape.remote.DiscordJoinRequest;
 import com.ashy0019.hapticscape.remote.DiscordPairingBridge;
@@ -51,6 +52,7 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 	private final JFrame frame = new JFrame("HapticScape");
 	private final JScrollPane pageScrollPane = new JScrollPane();
 	private final HapticScapePanel panel;
+	private final Level99DesktopOverlay level99Overlay;
 	private final DesktopSourceMessageService sourceMessages;
 	private final Runnable closeAction;
 	private final SettingsLockService settingsLockService;
@@ -123,7 +125,8 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 
 		frame.setContentPane(panel);
 		frame.setGlassPane(new StandaloneLevel99GlassPane(runtime.getLevel99CelebrationController()));
-		frame.getGlassPane().setVisible(true);
+		level99Overlay = new Level99DesktopOverlay(
+			runtime.getLevel99CelebrationController(), frame, (javax.swing.JComponent) frame.getGlassPane());
 		frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		frame.setMinimumSize(new Dimension(MINIMUM_WINDOW_WIDTH, MINIMUM_WINDOW_HEIGHT));
 		frame.setSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
@@ -470,6 +473,7 @@ public final class HapticScapeDesktopWindow implements AutoCloseable
 			protectedExitDialog = null;
 		}
 		sourceMessages.setListener(null);
+		level99Overlay.close();
 		panel.close();
 		frame.dispose();
 	}

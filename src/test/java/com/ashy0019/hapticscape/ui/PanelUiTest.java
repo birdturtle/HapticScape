@@ -20,6 +20,19 @@ import static org.junit.Assert.assertTrue;
 public class PanelUiTest
 {
 	@Test
+	public void controlWidthsKeepRoomForTheirText() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			javax.swing.JComboBox<String> selector = new javax.swing.JComboBox<>(
+				new String[] { "Ascending", "A longer custom pattern name" });
+			int needed = selector.getPreferredSize().width;
+			PanelUi.setFixedWidth(selector, PanelUi.SELECTOR_CONTROL_WIDTH);
+			assertTrue(selector.getPreferredSize().width >= needed);
+			assertTrue(selector.getMinimumSize().width >= needed);
+		});
+	}
+	@Test
 	public void preferredHeightRowsReserveSpaceForTextAddedLater() throws Exception
 	{
 		AtomicReference<JLabel> result = new AtomicReference<>();

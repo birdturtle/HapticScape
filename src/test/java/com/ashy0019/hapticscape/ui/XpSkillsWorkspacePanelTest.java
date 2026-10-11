@@ -14,4 +14,13 @@ public class XpSkillsWorkspacePanelTest
 		assertEquals(2, XpSkillsWorkspacePanel.layoutModeForWidth(1179));
 		assertEquals(3, XpSkillsWorkspacePanel.layoutModeForWidth(1180));
 	}
+
+	@Test
+	public void stacksBeforeMeasuredControlsWouldBeCompressed()
+	{
+		assertEquals(1, XpSkillsWorkspacePanel.layoutModeForWidth(800, 500, 360, 400));
+		assertEquals(2, XpSkillsWorkspacePanel.layoutModeForWidth(1000, 500, 360, 400));
+		assertEquals(2, XpSkillsWorkspacePanel.layoutModeForWidth(1180, 500, 360, 400));
+		assertEquals(3, XpSkillsWorkspacePanel.layoutModeForWidth(1400, 500, 360, 400));
+	}
 }

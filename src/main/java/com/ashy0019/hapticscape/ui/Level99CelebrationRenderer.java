@@ -83,12 +83,11 @@ private static final int MARQUEE_SPACING = 22;
 					pulse
 			);
 
-			int backgroundAlpha = 205 + Math.round(25 * pulse);
-			g.setColor(new Color(20, 14, 8, backgroundAlpha));
+			g.setColor(new Color(20, 14, 8));
 			g.fillRoundRect(CARD_X, CARD_Y, CARD_WIDTH, CARD_HEIGHT, 22, 22);
 
-			g.setStroke(new BasicStroke(2.0f + 3.0f * pulse));
-			g.setColor(blend(GOLD, Color.WHITE, pulse * 0.35f));
+			g.setStroke(new BasicStroke(3.0f));
+			g.setColor(GOLD);
 			g.drawRoundRect(
 				CARD_X + 2,
 				CARD_Y + 2,

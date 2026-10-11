@@ -84,7 +84,7 @@ final class PanelUi
 	static void setFixedWidth(JComponent component, int width)
 	{
 		Dimension preferredSize = component.getPreferredSize();
-		Dimension fixedSize = new Dimension(width, preferredSize.height);
+		Dimension fixedSize = new Dimension(Math.max(width, preferredSize.width), preferredSize.height);
 		component.setPreferredSize(fixedSize);
 		component.setMinimumSize(fixedSize);
 		component.setMaximumSize(fixedSize);

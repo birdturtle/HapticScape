@@ -17,6 +17,8 @@ public enum HapticEventType
 	INVENTORY_FULL(HapticPriority.GAMEPLAY, PlaybackPolicy.INTERRUPT_LOWER_OR_QUEUE, Duration.ofSeconds(3)),
 	SPECIAL_ATTACK_READY(HapticPriority.GAMEPLAY, PlaybackPolicy.INTERRUPT_LOWER_OR_QUEUE, Duration.ofSeconds(3)),
 
+	PHRASE_TRIGGER(HapticPriority.DIRECT, PlaybackPolicy.INTERRUPT_LOWER_OR_QUEUE, Duration.ofSeconds(2)),
+
 	DIRECT_MESSAGE(HapticPriority.DIRECT, PlaybackPolicy.INTERRUPT_LOWER_OR_QUEUE, Duration.ofSeconds(5)),
 	TRADE_REQUEST(HapticPriority.DIRECT, PlaybackPolicy.INTERRUPT_LOWER_OR_QUEUE, Duration.ofSeconds(5)),
 	REMOTE_ACTION(HapticPriority.MANUAL, PlaybackPolicy.INTERRUPT_LOWER, Duration.ZERO),

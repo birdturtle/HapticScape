@@ -33,7 +33,7 @@ final class WorkspaceShell extends JPanel
 	private static final int COMPACT_BREAKPOINT = 960;
 	private static final int WIDE_DOCK_BREAKPOINT = 1600;
 	private static final int RAIL_WIDTH = 164;
-	private static final int WORKSPACE_CONTENT_WIDTH = 800;
+	private static final int WORKSPACE_CONTENT_WIDTH = 1000;
 	private static final int WIDE_DOCK_GAP = 8;
 	private static final int WIDE_DOCK_MAX_WIDTH = 900;
 

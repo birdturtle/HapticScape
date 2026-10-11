@@ -916,6 +916,29 @@ mod tests {
         assert!(select_release(Vec::new(), true).is_err());
     }
     #[test]
+    fn stable_supersedes_same_version_rc_but_allows_newer_betas() {
+        let releases = |newer_beta: bool| {
+            let mut releases: Vec<GitHubRelease> = serde_json::from_str(
+                r#"[
+                    {"tag_name":"v3.2.0","assets":[]},
+                    {"tag_name":"v3.2.0-rc.2","prerelease":true,"assets":[]},
+                    {"tag_name":"v3.2.0-rc.1","prerelease":true,"assets":[]}
+                ]"#,
+            ).unwrap();
+            if newer_beta {
+                releases.push(serde_json::from_str(
+                    r#"{"tag_name":"v3.2.1-beta.1","prerelease":true,"assets":[]}"#,
+                ).unwrap());
+            }
+            releases
+        };
+        for beta in [false, true] {
+            assert_eq!(select_release(releases(false), beta).unwrap().tag_name, "v3.2.0");
+        }
+        assert_eq!(select_release(releases(true), true).unwrap().tag_name, "v3.2.1-beta.1");
+        assert_eq!(select_release(releases(true), false).unwrap().tag_name, "v3.2.0");
+    }
+    #[test]
     fn versions_and_assets_are_platform_specific_and_reject_injection() {
         assert_eq!(
             asset_name("v3.1.2", "linux", "x86_64").unwrap(),

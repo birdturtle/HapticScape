@@ -1,6 +1,8 @@
 package com.ashy0019.hapticscape;
 
 import com.ashy0019.hapticscape.clicker.ClickSequence;
+import com.ashy0019.hapticscape.clicker.ClickerPhraseRule;
+import com.ashy0019.hapticscape.clicker.PhraseTriggerCooldown;
 import com.ashy0019.hapticscape.event.ChatEvent;
 import com.ashy0019.hapticscape.event.InventoryChangedEvent;
 import com.ashy0019.hapticscape.event.LootReceivedEvent;
@@ -33,6 +35,8 @@ final class GameplayEventCoordinator implements GameplayEventSink, AutoCloseable
 		void dispatchGenericAlert();
 
 		void playClick(ClickSequence sequence);
+
+		default void playPhraseHaptics(ClickerPhraseRule rule) { }
 	}
 
 	private final Supplier<RemoteSettingsSnapshot> settingsSupplier;
@@ -43,6 +47,7 @@ final class GameplayEventCoordinator implements GameplayEventSink, AutoCloseable
 	private final AlertDeduplicator alertDeduplicator = new AlertDeduplicator();
 
 	private ScheduledExecutorService alertScheduler;
+	private final PhraseTriggerCooldown phraseCooldown = new PhraseTriggerCooldown();
 
 	GameplayEventCoordinator(
 		Supplier<RemoteSettingsSnapshot> settingsSupplier,
@@ -124,11 +129,15 @@ final class GameplayEventCoordinator implements GameplayEventSink, AutoCloseable
 			settings.getClickerPhraseRules(),
 			settings.getClickerAlertSettings()
 		);
-		if (decision.hasSpecificAlert())
+		ClickerPhraseRule phrase = decision.getPhraseRule();
+		if (phrase != null && !phraseCooldown.allow(phrase.getId())) return;
+		if (phrase != null) alertDeduplicator.recordSpecificAlert(System.nanoTime());
+		if (phrase != null && phrase.isHapticEnabled()) feedback.playPhraseHaptics(phrase);
+		if (decision.hasSpecificAlert() && (phrase == null || !phrase.isHapticEnabled()))
 		{
 			// Chat owns the combined phrase + semantic-alert click decision so
 			// one observation cannot stack two independent click sequences.
-			feedback.dispatchSpecificAlert(decision.getSpecificAlert(), false);
+			dispatchSpecificAlert(decision.getSpecificAlert(), false);
 		}
 		if (decision.shouldClick())
 		{

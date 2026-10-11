@@ -130,7 +130,8 @@ public final class RuneLiteEventBridge
 
 	public void onChatMessage(ChatMessage event)
 	{
-		sink.onChat(chatAdapter.adapt(event));
+		sink.onChat(chatAdapter.adapt(event, client.getLocalPlayer() == null
+			? null : client.getLocalPlayer().getName()));
 	}
 
 	public void onItemContainerChanged(ItemContainerChanged event)

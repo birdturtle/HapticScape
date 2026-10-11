@@ -109,7 +109,7 @@ public class WorkspaceShellTest
 		assertEquals(0, WorkspaceShell.workspaceContentWidthFor(-20));
 		assertEquals(520, WorkspaceShell.workspaceContentWidthFor(520));
 		assertEquals(800, WorkspaceShell.workspaceContentWidthFor(800));
-		assertEquals(800, WorkspaceShell.workspaceContentWidthFor(1600));
+		assertEquals(1000, WorkspaceShell.workspaceContentWidthFor(1600));
 
 		WorkspaceShell shell = onEdt(() ->
 		{
@@ -129,7 +129,7 @@ public class WorkspaceShellTest
 			widthHost.doLayout();
 			return null;
 		});
-		assertEquals(800, cards.getWidth());
+		assertEquals(1000, cards.getWidth());
 		onEdt(() ->
 		{
 			widthHost.setSize(620, 600);
@@ -180,9 +180,9 @@ public class WorkspaceShellTest
 		assertEquals(Boolean.TRUE, dockVisible.get());
 		assertTrue(dock.isVisible());
 		assertSame(dock, dockContent.getParent());
-		assertEquals(800, cards.getWidth());
-		assertEquals(808, dock.getX());
-		assertEquals(604, dock.getWidth());
+		assertEquals(1000, cards.getWidth());
+		assertEquals(1008, dock.getX());
+		assertEquals(404, dock.getWidth());
 	}
 
 	@Test

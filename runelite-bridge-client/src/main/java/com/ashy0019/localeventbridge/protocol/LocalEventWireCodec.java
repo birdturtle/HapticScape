@@ -72,6 +72,7 @@ public final class LocalEventWireCodec
 			payload.addProperty("kind", chatKindToWire(chat.getKind()));
 			payload.addProperty("rawMessage", chat.getRawMessage());
 			payload.addProperty("normalizedMessage", chat.getNormalizedMessage());
+			payload.addProperty("receivedPlayerMessage", chat.isReceivedPlayerMessage());
 		}
 		else if (event instanceof ActorDeathObservation)
 		{
@@ -199,7 +200,10 @@ public final class LocalEventWireCodec
 					source,
 					chatKindFromWire(requireString(payload, "kind")),
 					requireString(payload, "rawMessage"),
-					requireString(payload, "normalizedMessage")
+					requireString(payload, "normalizedMessage"),
+					payload.has("receivedPlayerMessage")
+						? requireBoolean(payload, "receivedPlayerMessage")
+						: "direct_message".equals(requireString(payload, "kind"))
 				);
 			case ActorDeathObservation.TYPE:
 				return new ActorDeathObservation(source);
