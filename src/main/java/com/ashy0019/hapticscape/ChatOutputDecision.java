@@ -3,6 +3,7 @@ package com.ashy0019.hapticscape;
 import com.ashy0019.hapticscape.clicker.ClickSequence;
 import com.ashy0019.hapticscape.clicker.ClickerAlertSettings;
 import com.ashy0019.hapticscape.clicker.ClickerPhraseRules;
+import com.ashy0019.hapticscape.clicker.ClickerPhraseRule;
 import com.ashy0019.hapticscape.event.ChatEvent;
 import java.util.Objects;
 
@@ -11,11 +12,13 @@ final class ChatOutputDecision
 {
 	private final AlertCategory specificAlert;
 	private final ClickSequence clickSequence;
+	private final ClickerPhraseRule phraseRule;
 
 	private ChatOutputDecision(
 		AlertCategory specificAlert,
-		ClickSequence clickSequence)
+		ClickSequence clickSequence, ClickerPhraseRule phraseRule)
 	{
+		this.phraseRule = phraseRule;
 		this.specificAlert = specificAlert;
 		this.clickSequence = Objects.requireNonNull(clickSequence, "clickSequence");
 	}
@@ -30,9 +33,12 @@ final class ChatOutputDecision
 		Objects.requireNonNull(alertSettings, "alertSettings");
 
 		String message = event.getNormalizedMessage();
-		ClickSequence phraseSequence = message.isEmpty()
-			? ClickSequence.NONE
-			: phraseRules.strongestMatch(message);
+		ClickerPhraseRule phraseRule = null;
+		if (event.isReceivedPlayerMessage() && !message.isEmpty())
+		{
+			for (ClickerPhraseRule candidate : phraseRules.getRules())
+				if (candidate.matches(message)) { phraseRule = candidate; break; }
+		}
 
 		AlertCategory specificAlert;
 		switch (event.getKind())
@@ -54,9 +60,12 @@ final class ChatOutputDecision
 			: alertSettings.getSequence(specificAlert);
 		return new ChatOutputDecision(
 			specificAlert,
-			ClickSequence.strongest(phraseSequence, alertSequence)
+			phraseRule != null && phraseRule.getSequence().isEnabled() ? phraseRule.getSequence() : alertSequence,
+			phraseRule
 		);
 	}
+
+	ClickerPhraseRule getPhraseRule() { return phraseRule; }
 
 	boolean hasSpecificAlert()
 	{

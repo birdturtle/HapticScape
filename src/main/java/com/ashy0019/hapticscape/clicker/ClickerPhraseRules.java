@@ -16,7 +16,8 @@ public final class ClickerPhraseRules
 
 	private static final String LEGACY_FORMAT_VERSION = "v1";
 	private static final String PREVIOUS_FORMAT_VERSION = "v2";
-	private static final String FORMAT_VERSION = "v3";
+	private static final String CLICK_FORMAT_VERSION = "v3";
+	private static final String FORMAT_VERSION = "v4";
 	private static final Base64.Encoder ENCODER =
 		Base64.getUrlEncoder().withoutPadding();
 	private static final Base64.Decoder DECODER =
@@ -63,6 +64,7 @@ public final class ClickerPhraseRules
 		String[] entries = configuredValue.split(";", -1);
 		if (entries.length == 0
 			|| (!FORMAT_VERSION.equals(entries[0])
+				&& !CLICK_FORMAT_VERSION.equals(entries[0])
 				&& !PREVIOUS_FORMAT_VERSION.equals(entries[0])
 				&& !LEGACY_FORMAT_VERSION.equals(entries[0])))
 		{
@@ -70,6 +72,7 @@ public final class ClickerPhraseRules
 		}
 		boolean legacy = LEGACY_FORMAT_VERSION.equals(entries[0]);
 		boolean previous = PREVIOUS_FORMAT_VERSION.equals(entries[0]);
+		boolean current = FORMAT_VERSION.equals(entries[0]);
 
 		List<ClickerPhraseRule> restored = new ArrayList<>();
 
@@ -83,7 +86,7 @@ public final class ClickerPhraseRules
 				continue;
 			}
 
-			int expectedFields = legacy ? 3 : previous ? 4 : 5;
+			int expectedFields = legacy ? 3 : previous ? 4 : current ? 9 : 5;
 			String[] fields = entry.split(",", expectedFields);
 			if (fields.length != expectedFields)
 			{
@@ -113,7 +116,7 @@ public final class ClickerPhraseRules
 				ClickSequence sequence = sequenceField < 0
 					? ClickSequence.ONE
 					: ClickSequence.fromConfigValue(fields[sequenceField], ClickSequence.NONE);
-				if (!sequence.isEnabled())
+				if (!sequence.isEnabled() && !current)
 				{
 					continue;
 				}
@@ -127,6 +130,7 @@ public final class ClickerPhraseRules
 					StandardCharsets.UTF_8
 				);
 
+				if (current && !("0".equals(fields[5]) || "1".equals(fields[5]))) continue;
 				String id = legacy
 					? legacyId(index, entry)
 					: fields[0];
@@ -135,7 +139,11 @@ public final class ClickerPhraseRules
 					enabled,
 					sequence,
 					mode,
-					expression
+					expression,
+					current && "1".equals(fields[5]),
+					current ? com.ashy0019.hapticscape.HapticPatternSelection.fromConfigValue(new String(DECODER.decode(fields[6]), StandardCharsets.UTF_8)) : com.ashy0019.hapticscape.HapticPatternSelection.SINGLE,
+					current ? Integer.parseInt(fields[7]) : 10,
+					current ? Integer.parseInt(fields[8]) : 500
 				);
 				boolean duplicate = false;
 				for (ClickerPhraseRule restoredRule : restored)
@@ -166,7 +174,9 @@ public final class ClickerPhraseRules
 		{
 			return false;
 		}
-		return configuredValue.equals(LEGACY_FORMAT_VERSION)
+		return configuredValue.equals(CLICK_FORMAT_VERSION)
+			|| configuredValue.startsWith(CLICK_FORMAT_VERSION + ";")
+			|| configuredValue.equals(LEGACY_FORMAT_VERSION)
 			|| configuredValue.startsWith(LEGACY_FORMAT_VERSION + ";")
 			|| configuredValue.equals(PREVIOUS_FORMAT_VERSION)
 			|| configuredValue.startsWith(PREVIOUS_FORMAT_VERSION + ";");
@@ -179,7 +189,11 @@ public final class ClickerPhraseRules
 
 	public boolean matches(String message)
 	{
-		return strongestMatch(message).isEnabled();
+		for (ClickerPhraseRule rule : rules)
+		{
+			if (rule.matches(message)) return true;
+		}
+		return false;
 	}
 
 	public ClickSequence strongestMatch(String message)
@@ -255,7 +269,11 @@ public final class ClickerPhraseRules
 				.append(',')
 				.append(ENCODER.encodeToString(
 					rule.getExpression().getBytes(StandardCharsets.UTF_8)
-				));
+				))
+				.append(',').append(rule.isHapticEnabled() ? '1' : '0')
+				.append(',').append(ENCODER.encodeToString(rule.getHapticPattern().toConfigValue().getBytes(StandardCharsets.UTF_8)))
+				.append(',').append(rule.getIntensityPercent())
+				.append(',').append(rule.getDurationMillis());
 		}
 
 		return encoded.toString();

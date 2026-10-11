@@ -25,6 +25,7 @@ public final class ChatMessageEvent implements LocalEvent
 	private final Kind kind;
 	private final String rawMessage;
 	private final String normalizedMessage;
+	private final boolean receivedPlayerMessage;
 
 	public ChatMessageEvent(
 		String source,
@@ -32,6 +33,12 @@ public final class ChatMessageEvent implements LocalEvent
 		String rawMessage,
 		String normalizedMessage)
 	{
+		this(source, kind, rawMessage, normalizedMessage, kind == Kind.DIRECT_MESSAGE);
+	}
+
+	public ChatMessageEvent(String source, Kind kind, String rawMessage, String normalizedMessage, boolean receivedPlayerMessage)
+	{
+		this.receivedPlayerMessage = receivedPlayerMessage;
 		this.source = requireIdentifier(source, "source");
 		this.kind = Objects.requireNonNull(kind, "kind");
 		this.rawMessage = rawMessage == null ? "" : rawMessage;
@@ -54,6 +61,8 @@ public final class ChatMessageEvent implements LocalEvent
 	{
 		return kind;
 	}
+
+	public boolean isReceivedPlayerMessage() { return receivedPlayerMessage; }
 
 	public String getRawMessage()
 	{

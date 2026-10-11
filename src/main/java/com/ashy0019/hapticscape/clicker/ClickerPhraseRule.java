@@ -1,5 +1,6 @@
 package com.ashy0019.hapticscape.clicker;
 
+import com.ashy0019.hapticscape.HapticPatternSelection;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -16,6 +17,10 @@ public final class ClickerPhraseRule
 	private final String expression;
 	private final String normalizedLiteral;
 	private final Pattern regexPattern;
+	private final boolean hapticEnabled;
+	private final HapticPatternSelection hapticPattern;
+	private final int intensityPercent;
+	private final int durationMillis;
 
 	public ClickerPhraseRule(
 		boolean enabled,
@@ -50,12 +55,24 @@ public final class ClickerPhraseRule
 		ClickerPhraseMatchMode mode,
 		String expression)
 	{
+		this(id, enabled, sequence, mode, expression, false, HapticPatternSelection.SINGLE, 10, 500);
+	}
+
+	ClickerPhraseRule(String id, boolean enabled, ClickSequence sequence, ClickerPhraseMatchMode mode,
+		String expression, boolean hapticEnabled, HapticPatternSelection hapticPattern, int intensityPercent, int durationMillis)
+	{
+		this.hapticEnabled = hapticEnabled;
+		this.hapticPattern = Objects.requireNonNull(hapticPattern, "hapticPattern");
+		if (intensityPercent < 0 || intensityPercent > 100 || durationMillis < 50 || durationMillis > 10000)
+			throw new IllegalArgumentException("Haptic intensity must be 0–100% and duration 50–10000 ms");
+		this.intensityPercent = intensityPercent;
+		this.durationMillis = durationMillis;
 		this.id = canonicalUuid(id);
 		this.enabled = enabled;
 		this.sequence = Objects.requireNonNull(sequence, "sequence");
-		if (!sequence.isEnabled())
+		if (!sequence.isEnabled() && !hapticEnabled)
 		{
-			throw new IllegalArgumentException("Enabled phrase rules must request one to three clicks");
+			throw new IllegalArgumentException("Choose clicks, haptics, or both");
 		}
 		this.mode = Objects.requireNonNull(mode, "mode");
 		this.expression = Objects.requireNonNull(expression, "expression");
@@ -93,7 +110,8 @@ public final class ClickerPhraseRule
 		ClickerPhraseMatchMode mode,
 		String expression)
 	{
-		return new ClickerPhraseRule(id, enabled, sequence, mode, expression);
+		return new ClickerPhraseRule(id, enabled, sequence, mode, expression,
+			hapticEnabled, hapticPattern, intensityPercent, durationMillis);
 	}
 
 	public ClickerPhraseRule withValues(
@@ -102,8 +120,19 @@ public final class ClickerPhraseRule
 		ClickerPhraseMatchMode mode,
 		String expression)
 	{
-		return new ClickerPhraseRule(id, enabled, sequence, mode, expression);
+		return new ClickerPhraseRule(id, enabled, sequence, mode, expression,
+			hapticEnabled, hapticPattern, intensityPercent, durationMillis);
 	}
+
+	public ClickerPhraseRule withFeedback(ClickSequence clicks, boolean haptics, HapticPatternSelection pattern, int intensity, int duration)
+	{
+		return new ClickerPhraseRule(id, enabled, clicks, mode, expression, haptics, pattern, intensity, duration);
+	}
+
+	public boolean isHapticEnabled() { return hapticEnabled; }
+	public HapticPatternSelection getHapticPattern() { return hapticPattern; }
+	public int getIntensityPercent() { return intensityPercent; }
+	public int getDurationMillis() { return durationMillis; }
 
 	public boolean isEnabled()
 	{
@@ -134,6 +163,11 @@ public final class ClickerPhraseRule
 
 		switch (mode)
 		{
+			case PHRASE:
+				String text = message.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+				String phrase = normalizedLiteral.trim().replaceAll("\\s+", " ");
+				return Pattern.compile("(?<![\\p{L}\\p{N}_])" + Pattern.quote(phrase)
+					+ "(?![\\p{L}\\p{N}_])").matcher(text).find();
 			case CONTAINS:
 				return message.toLowerCase(Locale.ROOT).contains(normalizedLiteral);
 			case EXACT:
@@ -163,13 +197,15 @@ public final class ClickerPhraseRule
 			&& enabled == that.enabled
 			&& sequence == that.sequence
 			&& mode == that.mode
-			&& expression.equals(that.expression);
+			&& expression.equals(that.expression)
+			&& hapticEnabled == that.hapticEnabled && hapticPattern.equals(that.hapticPattern)
+			&& intensityPercent == that.intensityPercent && durationMillis == that.durationMillis;
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return Objects.hash(id, enabled, sequence, mode, expression);
+		return Objects.hash(id, enabled, sequence, mode, expression, hapticEnabled, hapticPattern, intensityPercent, durationMillis);
 	}
 
 	@Override
@@ -184,12 +220,9 @@ public final class ClickerPhraseRule
 			preview = preview.substring(0, 57) + "...";
 		}
 
-		return (enabled ? "" : "(off) ")
-			+ sequence.getClickCount()
-			+ (sequence == ClickSequence.ONE ? " click · " : " clicks · ")
-			+ mode
-			+ ": "
-			+ preview;
+		String feedback = sequence.isEnabled() ? sequence.toString() : "";
+		if (hapticEnabled) feedback += (feedback.isEmpty() ? "" : " + ") + "Haptics";
+		return (enabled ? "" : "(off) ") + preview + " · " + feedback;
 	}
 
 	private static String canonicalUuid(String value)

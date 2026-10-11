@@ -27,6 +27,11 @@ import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+import com.ashy0019.hapticscape.CustomPatternLibrary;
+import com.ashy0019.hapticscape.HapticPatternSelection;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
@@ -54,7 +59,7 @@ final class ClickerPhraseRulesPanel extends JPanel
 	private final DefaultListModel<ClickerPhraseRule> ruleModel =
 		new DefaultListModel<>();
 	private final JList<ClickerPhraseRule> ruleList = new JList<>(ruleModel);
-	private final JButton addButton = new JButton("New rule");
+	private final JButton addButton = new JButton("New trigger");
 	private final JButton deleteButton = new JButton("Delete");
 	private final JLabel ruleCountLabel = new JLabel();
 	private final JLabel editorTitle = new JLabel("No rule selected");
@@ -62,9 +67,15 @@ final class ClickerPhraseRulesPanel extends JPanel
 	private final JComboBox<ClickerPhraseMatchMode> editorMode =
 		new JComboBox<>(ClickerPhraseMatchMode.values());
 	private final JComboBox<ClickSequence> editorSequence =
-		ClickSequenceControls.enabledOnly();
-	private final JTextArea editorExpression = new JTextArea(5, 28);
-	private final JButton saveButton = new JButton("Save rule");
+		ClickSequenceControls.optional();
+	private final JTextArea editorExpression = new JTextArea(2, 28);
+	private final JPanel legacyMatchRow = new JPanel(new BorderLayout(8, 0));
+	private final JCheckBox editorHaptics = new JCheckBox("Haptics");
+	private final JComboBox<HapticPatternSelection> editorPattern;
+	private final JSpinner editorIntensity = new JSpinner(new SpinnerNumberModel(10, 0, 100, 1));
+	private final JSpinner editorDuration = new JSpinner(new SpinnerNumberModel(500, 50, 10000, 50));
+	private final Supplier<CustomPatternLibrary> patternLibrary;
+	private final JButton saveButton = new JButton("Save trigger");
 	private final JButton cancelButton = new JButton("Cancel");
 	private final JPanel editorPanel = new JPanel();
 	private final JPanel responsiveContent = new JPanel(new GridBagLayout());
@@ -90,8 +101,10 @@ final class ClickerPhraseRulesPanel extends JPanel
 		SettingsLockService lockService,
 		SettingsLockDraft lockDraft,
 		BooleanSupplier editingRemoteSubject,
-		BooleanSupplier lockSelectionEnabled)
+		BooleanSupplier lockSelectionEnabled, Supplier<CustomPatternLibrary> patternLibrary)
 	{
+		this.patternLibrary = patternLibrary;
+		editorPattern = PanelUi.createPatternComboBox(patternLibrary);
 		this.settingsSink = settingsSink;
 		this.sessionManager = sessionManager;
 		this.lockService = lockService;
@@ -110,11 +123,11 @@ final class ClickerPhraseRulesPanel extends JPanel
 
 		setName("phraseRulesWorkspace");
 		setLayout(new BorderLayout(0, 5));
-		setBorder(PanelUi.createSectionBorder("Phrase rules"));
+		setBorder(PanelUi.createSectionBorder("Chat triggers"));
 		JPanel heading = new JPanel(new BorderLayout(8, 0));
-		JLabel description = new JLabel("Play click feedback when an incoming chat message matches a rule.");
+		JLabel description = new JLabel("Respond to words or phrases received from other players.");
 		description.setToolTipText(
-			"Contains and Exact ignore case. Regex uses Java regular expressions."
+			"Your own messages are ignored. The first matching trigger wins, with a one-second cooldown."
 		);
 		heading.add(description, BorderLayout.CENTER);
 		heading.add(ruleCountLabel, BorderLayout.EAST);
@@ -199,17 +212,25 @@ final class ClickerPhraseRulesPanel extends JPanel
 		PanelUi.addPreferredHeightComponent(editorPanel, editorTitle);
 		PanelUi.addPreferredHeightComponent(editorPanel, editorEnabled);
 		PanelUi.setFixedWidth(editorMode, PanelUi.SELECTOR_CONTROL_WIDTH);
-		PanelUi.addPreferredHeightComponent(editorPanel, row("Match", editorMode));
+		legacyMatchRow.add(new JLabel("Legacy matching"), BorderLayout.WEST);
+		legacyMatchRow.add(editorMode, BorderLayout.EAST);
+		PanelUi.addPreferredHeightComponent(editorPanel, legacyMatchRow);
 		PanelUi.addPreferredHeightComponent(editorPanel, row("Clicks", editorSequence));
-		PanelUi.addPreferredHeightComponent(editorPanel, new JLabel("Phrase or regular expression"));
+		PanelUi.addPreferredHeightComponent(editorPanel, editorHaptics);
+		PanelUi.addPreferredHeightComponent(editorPanel, row("Pattern", editorPattern));
+		PanelUi.setFixedWidth(editorIntensity, PanelUi.NUMERIC_CONTROL_WIDTH);
+		PanelUi.setFixedWidth(editorDuration, PanelUi.NUMERIC_CONTROL_WIDTH);
+		PanelUi.addPreferredHeightComponent(editorPanel, row("Intensity (%)", editorIntensity));
+		PanelUi.addPreferredHeightComponent(editorPanel, row("Duration (ms)", editorDuration));
+		PanelUi.addPreferredHeightComponent(editorPanel, new JLabel("Word or phrase"));
 		editorExpression.setLineWrap(false);
 		JScrollPane expressionScroll = new JScrollPane(editorExpression);
 		expressionScroll.setName("phraseExpressionScroll");
 		PanelUi.setFlexibleWidthHeightHint(expressionScroll, 112, 80);
 		PanelUi.addPreferredHeightComponent(editorPanel, expressionScroll);
-		JLabel hint = new JLabel("Contains/Exact ignore case; Regex uses Java syntax.");
+		JLabel hint = new JLabel("Whole words and phrases; capitalization is ignored.");
 		hint.setToolTipText(
-			"Regex uses find(). Add ^...$ for a whole-message match or (?i) for case-insensitive matching."
+			"For example, good job matches You did a good job!, but good does not match goodbye."
 		);
 		PanelUi.addPreferredHeightComponent(editorPanel, hint);
 
@@ -244,6 +265,10 @@ final class ClickerPhraseRulesPanel extends JPanel
 		editorEnabled.addActionListener(event -> markDirty());
 		editorMode.addActionListener(event -> markDirty());
 		editorSequence.addActionListener(event -> markDirty());
+		editorHaptics.addActionListener(event -> { markDirty(); refreshEnabledState(); });
+		editorPattern.addActionListener(event -> markDirty());
+		editorIntensity.addChangeListener(event -> markDirty());
+		editorDuration.addChangeListener(event -> markDirty());
 		editorExpression.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
@@ -308,16 +333,19 @@ final class ClickerPhraseRulesPanel extends JPanel
 			ClickerPhraseRule updated = existing == null
 				? new ClickerPhraseRule(
 					editorEnabled.isSelected(),
-					sequence,
+					ClickSequence.ONE,
 					mode,
 					editorExpression.getText()
 				)
 				: existing.withValues(
 					editorEnabled.isSelected(),
-					sequence,
+					ClickSequence.ONE,
 					mode,
 					editorExpression.getText()
 				);
+			updated = updated.withFeedback(sequence, editorHaptics.isSelected(),
+				(HapticPatternSelection) editorPattern.getSelectedItem(),
+				(Integer) editorIntensity.getValue(), (Integer) editorDuration.getValue());
 			if (existing == null)
 			{
 				rules = rules.withAdded(updated);
@@ -388,21 +416,40 @@ final class ClickerPhraseRulesPanel extends JPanel
 		refreshEnabledState();
 	}
 
+	public void refreshPatternChoices()
+	{
+		loadingEditor = true;
+		try
+		{
+			PanelUi.setPatternChoices(editorPattern,
+				(HapticPatternSelection) editorPattern.getSelectedItem(), patternLibrary.get());
+		}
+		finally
+		{
+			loadingEditor = false;
+		}
+	}
+
 	private void loadEditor(ClickerPhraseRule rule, boolean newRule)
 	{
 		loadingEditor = true;
 		try
 		{
 			editorTitle.setText(newRule
-				? "New phrase rule"
+				? "New chat trigger"
 				: rule == null ? "No rule selected" : rule.toString());
 			editorEnabled.setSelected(rule == null || rule.isEnabled());
 			editorMode.setSelectedItem(
-				rule == null ? ClickerPhraseMatchMode.CONTAINS : rule.getMode()
+				rule == null ? ClickerPhraseMatchMode.PHRASE : rule.getMode()
 			);
 			editorSequence.setSelectedItem(
 				rule == null ? ClickSequence.ONE : rule.getSequence()
 			);
+			editorHaptics.setSelected(rule != null && rule.isHapticEnabled());
+			editorIntensity.setValue(rule == null ? 10 : rule.getIntensityPercent());
+			editorDuration.setValue(rule == null ? 500 : rule.getDurationMillis());
+			PanelUi.setPatternChoices(editorPattern, rule == null ? HapticPatternSelection.SINGLE : rule.getHapticPattern(), patternLibrary.get());
+			legacyMatchRow.setVisible(rule != null && rule.getMode() != ClickerPhraseMatchMode.PHRASE);
 			editorExpression.setText(rule == null ? "" : rule.getExpression());
 			editorExpression.setCaretPosition(0);
 		}
@@ -461,6 +508,10 @@ final class ClickerPhraseRulesPanel extends JPanel
 		editorEnabled.setEnabled(editorEditable);
 		editorMode.setEnabled(editorEditable);
 		editorSequence.setEnabled(editorEditable);
+		editorHaptics.setEnabled(editorEditable);
+		editorPattern.setEnabled(editorEditable && editorHaptics.isSelected());
+		editorIntensity.setEnabled(editorEditable && editorHaptics.isSelected());
+		editorDuration.setEnabled(editorEditable && editorHaptics.isSelected());
 		editorExpression.setEnabled(editorEditable);
 		saveButton.setEnabled(editorEditable && dirty);
 		cancelButton.setEnabled(dirty);

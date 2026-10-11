@@ -22,7 +22,7 @@ public class ChatOutputDecisionTest
 				"test-source",
 				ChatEvent.Kind.OTHER,
 				"<col=ffffff>Hello world</col>",
-				"Hello world"
+				"Hello world", true
 			),
 			phraseRules("hello", ClickSequence.TWO),
 			ClickerAlertSettings.noneEnabled()
@@ -34,7 +34,7 @@ public class ChatOutputDecisionTest
 	}
 
 	@Test
-	public void directMessageAndPhraseResolveToStrongestSingleSequence()
+	public void phraseClicksTakePrecedenceOverDirectMessageClicks()
 	{
 		ClickerAlertSettings alerts = ClickerAlertSettings.noneEnabled()
 			.withSequence(AlertCategory.DIRECT_MESSAGE, ClickSequence.TWO);
@@ -45,11 +45,11 @@ public class ChatOutputDecisionTest
 				"Hello there",
 				"Hello there"
 			),
-			phraseRules("hello", ClickSequence.THREE),
+			phraseRules("hello", ClickSequence.ONE),
 			alerts
 		);
 
-		assertEquals(ClickSequence.THREE, decision.getClickSequence());
+		assertEquals(ClickSequence.ONE, decision.getClickSequence());
 		assertTrue(decision.hasSpecificAlert());
 		assertEquals(AlertCategory.DIRECT_MESSAGE, decision.getSpecificAlert());
 	}
@@ -74,6 +74,31 @@ public class ChatOutputDecisionTest
 		assertTrue(decision.shouldClick());
 		assertTrue(decision.hasSpecificAlert());
 		assertEquals(AlertCategory.TRADE_REQUEST, decision.getSpecificAlert());
+	}
+
+	@Test
+	public void ownAndUnknownMessagesCannotTriggerPhrases()
+	{
+		for (boolean incoming : new boolean[] {false, true})
+		{
+			ChatOutputDecision decision = ChatOutputDecision.classify(
+				new ChatEvent("test", ChatEvent.Kind.OTHER, "hello", "hello", incoming),
+				phraseRules("hello", ClickSequence.TWO), ClickerAlertSettings.noneEnabled());
+			assertEquals(incoming, decision.shouldClick());
+		}
+		assertFalse(ChatOutputDecision.classify(
+			new ChatEvent("test", ChatEvent.Kind.OTHER, "hello", "hello"),
+			phraseRules("hello", ClickSequence.TWO), ClickerAlertSettings.noneEnabled()).shouldClick());
+	}
+
+	@Test
+	public void firstMatchingRuleWins()
+	{
+		ClickerPhraseRules rules = phraseRules("hello", ClickSequence.ONE)
+			.withAdded(new ClickerPhraseRule(true, ClickSequence.THREE, ClickerPhraseMatchMode.PHRASE, "hello world"));
+		assertEquals(ClickSequence.ONE, ChatOutputDecision.classify(
+			new ChatEvent("test", ChatEvent.Kind.OTHER, "hello world", "hello world", true),
+			rules, ClickerAlertSettings.noneEnabled()).getClickSequence());
 	}
 
 	private static ClickerPhraseRules phraseRules(String phrase, ClickSequence sequence)

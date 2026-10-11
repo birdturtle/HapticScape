@@ -11,6 +11,17 @@ public class RuneLiteChatAdapterTest
 	private final RuneLiteChatAdapter adapter = new RuneLiteChatAdapter();
 
 	@Test
+	public void onlyIncomingPlayerChatQualifies()
+	{
+		org.junit.Assert.assertTrue(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.PUBLICCHAT, "Other", "Me"));
+		org.junit.Assert.assertFalse(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.PUBLICCHAT, "<img=1>MY_Name", "my name"));
+		org.junit.Assert.assertFalse(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.PUBLICCHAT, "Other", null));
+		org.junit.Assert.assertFalse(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.GAMEMESSAGE, "Other", "Me"));
+		org.junit.Assert.assertFalse(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.PRIVATECHATOUT, "Other", "Me"));
+		org.junit.Assert.assertTrue(RuneLiteChatAdapter.receivedFromPlayer(ChatMessageType.PRIVATECHAT, "Other", null));
+	}
+
+	@Test
 	public void classifiesPrivateMessages()
 	{
 		assertEquals(
