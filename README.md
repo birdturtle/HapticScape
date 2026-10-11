@@ -11,6 +11,14 @@ Prebuilt releases support Windows 10 and newer and x86_64 Linux.
 
  <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/580678a7-47d7-4c2c-8fd1-048a0f7a1a6c" />
 
+## New in 3.2.1
+
+- Level 99 celebrations appear over the desktop and scale to your screen.
+- Chat triggers match words and phrases received from other players, with clicks, haptics, or both.
+- Your own chat messages no longer activate chat triggers.
+- Gameplay controls keep enough space for their labels at smaller window sizes.
+- Stable releases take priority over RC releases of the same version when beta updates are enabled.
+
 ## New Features
 - Unified launcher for HapticScape, LumBridge and updates.
 - Windows and Linux launcher installers with automatic app downloads.
@@ -64,10 +72,10 @@ Use an x86_64 desktop with WebKitGTK 4.1, GTK 3 and a Secret Service wallet such
 
 ### Installer
 
-Download `HapticScape-Linux-x64-3.2.0.run` from [the latest release](https://github.com/birdturtle/HapticScape/releases/latest), then run:
+Download `HapticScape-Linux-x64-3.2.1.run` from [the latest release](https://github.com/birdturtle/HapticScape/releases/latest), then run:
 
 ```sh
-bash HapticScape-Linux-x64-3.2.0.run
+bash HapticScape-Linux-x64-3.2.1.run
 ```
 
 Open **HapticScape Launcher** from the application menu. Wait for the app downloads, add your Jagex account and select **Play**.
@@ -77,7 +85,7 @@ Open **HapticScape Launcher** from the application menu. Wait for the app downlo
 Download the `.deb` from the release page and install it:
 
 ```sh
-sudo apt install ./hapticscape-launcher_3.2.0_amd64.deb
+sudo apt install ./hapticscape-launcher_3.2.1_amd64.deb
 ```
 
 ## Using the launcher
