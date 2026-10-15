@@ -1,0 +1,62 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate release tag and notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 packaging/release/prepare.py "$RELEASE_TAG"
+          if [[ "$RELEASE_TAG" != *-* ]]; then
+            git merge-base --is-ancestor HEAD origin/master
+          fi
+  packages:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+  publish:
+    needs: [validate, packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hapticscape-*-packages-*
+          path: artifacts
+      - name: Validate complete release assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 packaging/release/prepare.py "$RELEASE_TAG" --artifacts artifacts --output build/release
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          flags=()
+          if [[ "$version" == *-* ]]; then flags+=(--prerelease --latest=false); else flags+=(--prerelease=false --latest); fi
+          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-draft"; then
+            test "$(cat "$RUNNER_TEMP/release-draft")" = true || { echo 'Release already published; refusing to replace it.' >&2; exit 1; }
+            gh release edit "$RELEASE_TAG" --title "HapticScape $version" --notes-file "docs/releases/$version.md"
+          else
+            gh release create "$RELEASE_TAG" --draft --verify-tag --title "HapticScape $version" --notes-file "docs/releases/$version.md"
+          fi
+          gh release upload "$RELEASE_TAG" build/release/* --clobber
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/uploaded-assets.json"
+          python3 packaging/release/prepare.py "$RELEASE_TAG" --output build/release --uploaded "$RUNNER_TEMP/uploaded-assets.json"
+          gh release edit "$RELEASE_TAG" --draft=false "${flags[@]}"

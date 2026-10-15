@@ -44,7 +44,7 @@ $signature = Get-AuthenticodeSignature $installer
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation(?:,|$)') { throw 'The browser runtime installer did not pass Microsoft signature validation.' }
 @{ schemaVersion = 1; version = $Version; repository = 'birdturtle/HapticScape'; launcher = 'launcher/HapticScapeLauncher.exe' } | ConvertTo-Json | Set-Content "$package\app\suite.json" -Encoding UTF8
 $zip = Join-Path $root "build\distribution\HapticScape-Windows-$Architecture-$Version.zip"
-Remove-Item $zip -Force
+if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path $package -DestinationPath $zip -CompressionLevel Optimal
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($zip))" | Set-Content "$zip.sha256" -Encoding ASCII
