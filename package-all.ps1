@@ -81,17 +81,17 @@ try
     Write-Host '=== Packaging standalone HapticScape ===' -ForegroundColor Cyan
     # Run this first: it performs a root Gradle clean, so doing it second would
     # delete bridge packaging output produced earlier in the same run.
-    & $desktopPackager -Version $Version
+    & $desktopPackager -Version $Version -SkipArchive:$UnifiedLauncher
 
     Write-Host ''
     Write-Host '=== Packaging LumBridge ===' -ForegroundColor Cyan
     if ([string]::IsNullOrWhiteSpace($RuneLiteVersion))
     {
-        & $bridgePackager -Version $Version
+        & $bridgePackager -Version $Version -SkipArchive:$UnifiedLauncher
     }
     else
     {
-        & $bridgePackager -Version $Version -RuneLiteVersion $RuneLiteVersion
+        & $bridgePackager -Version $Version -RuneLiteVersion $RuneLiteVersion -SkipArchive:$UnifiedLauncher
     }
 
     if ($UnifiedLauncher) { & (Join-Path $projectRoot 'package-unified-launcher.ps1') -Version $Version -Architecture $architecture }
@@ -100,14 +100,13 @@ try
     {
         throw "Standalone HapticScape package was not created: $desktopZip"
     }
-    if (-not (Test-Path $bridgeZip -PathType Leaf))
+    if (!$UnifiedLauncher -and -not (Test-Path $bridgeZip -PathType Leaf))
     {
         throw "LumBridge package was not created: $bridgeZip"
     }
 
     Write-Host ''
     if ($UnifiedLauncher) {
-        Remove-Item $bridgeZip, "$bridgeZip.sha256" -Force
         Write-Host "User download: $(Join-Path $distributionDirectory "HapticScape-Launcher-Windows-$architecture-$Version.exe")"
     }
     Write-Host 'Packages created successfully:' -ForegroundColor Green

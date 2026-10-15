@@ -1,6 +1,7 @@
 param(
 	[ValidatePattern("^[0-9]+(?:\.[0-9]+){0,3}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$")]
-	[string]$Version
+	[string]$Version,
+    [switch]$SkipArchive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -223,32 +224,35 @@ try
 		throw "The Windows launcher compiler failed with exit code $LASTEXITCODE."
 	}
 
-	$zipPath = Join-Path $distributionDirectory "HapticScape-Windows-$architecture-$Version.zip"
-	$checksumPath = "$zipPath.sha256"
-	if (Test-Path $zipPath)
-	{
-		Remove-Item -Force $zipPath
-	}
-	if (Test-Path $checksumPath)
-	{
-		Remove-Item -Force $checksumPath
-	}
+    if (!$SkipArchive) {
+        $zipPath = Join-Path $distributionDirectory "HapticScape-Windows-$architecture-$Version.zip"
+        $checksumPath = "$zipPath.sha256"
+        if (Test-Path $zipPath)
+        {
+            Remove-Item -Force $zipPath
+        }
+        if (Test-Path $checksumPath)
+        {
+            Remove-Item -Force $checksumPath
+        }
 
-	Write-Host 'Compressing the distributable bundle...'
-	Compress-Archive -Path $appDirectory -DestinationPath $zipPath -CompressionLevel Optimal
-	$hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
-	[System.IO.File]::WriteAllText(
-		$checksumPath,
-		"$hash *$(Split-Path -Leaf $zipPath)`r`n",
-		[System.Text.Encoding]::ASCII
-	)
+        Write-Host 'Compressing the distributable bundle...'
+        Compress-Archive -Path $appDirectory -DestinationPath $zipPath -CompressionLevel Optimal
+        $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+        [System.IO.File]::WriteAllText(
+            $checksumPath,
+            "$hash *$(Split-Path -Leaf $zipPath)`r`n",
+            [System.Text.Encoding]::ASCII
+        )
 
-	Write-Host ''
-	Write-Host 'Package created successfully:' -ForegroundColor Green
-	Write-Host $zipPath
-	Write-Host $checksumPath
-	Write-Host ''
-	Write-Host 'Test build\windows-package\HapticScape\HapticScape.exe before sharing the ZIP.'
+        Write-Host ''
+        Write-Host 'Package created successfully:' -ForegroundColor Green
+        Write-Host $zipPath
+        Write-Host $checksumPath
+        Write-Host ''
+        Write-Host 'Test build\windows-package\HapticScape\HapticScape.exe before sharing the ZIP.'
+    }
+
 }
 finally
 {

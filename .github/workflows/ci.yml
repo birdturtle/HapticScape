@@ -2,8 +2,10 @@ name: CI
 
 on:
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -25,6 +27,9 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Test release assembly
+        run: python3 -m unittest discover -s packaging/release -p "test_*.py"
 
       - name: Test remote relay
         working-directory: remote-relay
@@ -115,6 +120,13 @@ jobs:
           cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
           if ($LASTEXITCODE -ne 0) { throw 'Windows update archive verification failed.' }
 
+      - name: Verify packaged RuneLite pin
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem build/distribution/HapticScape-Windows-*.zip | Select-Object -First 1
+          python packaging/release/prepare.py v0.0.0-ci --package $archive.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged RuneLite version does not match its source pin.' }
+
       - name: Upload Windows package candidates
         uses: actions/upload-artifact@v4
         with:
@@ -123,6 +135,7 @@ jobs:
             build/distribution/HapticScape-Windows-*.zip*
             build/distribution/HapticScape-Launcher-Windows-*.exe*
             build/distribution/HapticScape-Suite-*.json
+          if-no-files-found: error
           retention-days: 7
 
   package-linux:
@@ -159,6 +172,10 @@ jobs:
           export HAPTICSCAPE_UPDATE_VERSION=$(python3 -c 'import glob,json; print(json.load(open(glob.glob("build/distribution/HapticScape-Suite-*.json")[0]))["version"])')
           export HAPTICSCAPE_UPDATE_ARCHIVE=$(realpath build/distribution/HapticScape-Linux-x64-*.tar.gz)
           cargo test --manifest-path suite-launcher/src-tauri/Cargo.toml full_distribution_archive -- --ignored
+      - name: Verify packaged RuneLite pin
+        run: |
+          archive=$(find build/distribution -maxdepth 1 -name 'HapticScape-Linux-x64-*.tar.gz' -print -quit)
+          python3 packaging/release/prepare.py v0.0.0-ci --package "$archive"
       - name: Test installed Linux package startup
         run: python3 packaging/linux/test-package.py build/distribution/HapticScape-Linux-x64-*.run
       - name: Test packaged Linux update and rollback
@@ -172,4 +189,5 @@ jobs:
             build/distribution/*.run*
             build/distribution/*.tar.gz*
             build/distribution/*.deb*
+          if-no-files-found: error
           retention-days: 7
