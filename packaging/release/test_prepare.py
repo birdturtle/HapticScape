@@ -1,6 +1,11 @@
 import hashlib
 import io
 import json
+import os
+import shutil
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 import tarfile
 import tempfile
@@ -96,6 +101,54 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError): verify_uploaded(self.output, metadata, 'v' + self.version)
         metadata['draft'] = False
         with self.assertRaises(ValueError): verify_uploaded(self.output, metadata, 'v' + self.version)
+
+    @unittest.skipIf(os.name == 'nt', 'The publish job uses Bash on Linux')
+    def test_publish_creates_draft_and_fetches_it_by_id_before_publication(self):
+        self.assemble()
+        repository = Path(__file__).resolve().parents[2]
+        work = self.root / 'publish-job'
+        (work / 'build').mkdir(parents=True)
+        shutil.copytree(self.output, work / 'build/release')
+        (work / 'packaging/release').mkdir(parents=True)
+        shutil.copyfile(repository / 'packaging/release/prepare.py', work / 'packaging/release/prepare.py')
+        (work / 'runelite-bridge-client').mkdir()
+        (work / 'runelite-bridge-client/RUNTIME.properties').write_text('runeLiteVersion=' + self.pin)
+        (work / 'docs/releases').mkdir(parents=True)
+        (work / f'docs/releases/{self.version}.md').write_text('Release notes')
+        metadata = {'draft': True, 'tag_name': 'v' + self.version, 'assets': [
+            {'name': p.name, 'digest': 'sha256:' + hashlib.sha256(p.read_bytes()).hexdigest()}
+            for p in self.output.iterdir()]}
+        (work / 'metadata.json').write_text(json.dumps(metadata))
+        tools = work / 'tools'
+        tools.mkdir()
+        stub = tools / 'gh'
+        stub.write_text('#!' + sys.executable + '\n' + textwrap.dedent("""
+            import json, pathlib, sys
+            args = sys.argv[1:]
+            state = pathlib.Path('draft-created')
+            if args[:2] == ['release', 'view']:
+                if not state.exists(): sys.exit(1)
+                print('true' if 'isDraft' in args else '12345')
+            elif args[:2] == ['release', 'create']:
+                assert '--draft' in args
+                state.touch()
+            elif args[:2] == ['release', 'upload']:
+                assert state.exists()
+            elif args[:1] == ['api']:
+                assert args[1] == 'repos/fixture/repo/releases/12345', 'Drafts must be fetched by numeric ID'
+                print(pathlib.Path('metadata.json').read_text())
+            elif args[:2] == ['release', 'edit']:
+                if '--draft=false' in args:
+                    assert pathlib.Path('uploaded-assets.json').exists()
+                    pathlib.Path('published').touch()
+            else: sys.exit(1)
+        """))
+        stub.chmod(0o755)
+        workflow = (repository / '.github/workflows/release.yml').read_text()
+        script = textwrap.dedent(workflow.rsplit('        run: |\n', 1)[1])
+        result = subprocess.run(['bash', '-c', script], cwd=work, env=dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'], RELEASE_TAG='v' + self.version, GH_REPO='fixture/repo', RUNNER_TEMP=str(work)), capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((work / 'published').is_file())
 
     def test_versions_require_three_components_and_reject_paths(self):
         self.assertEqual(version('v3.2.2'), '3.2.2')
