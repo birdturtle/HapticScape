@@ -1,7 +1,7 @@
 fn main() {
     let attributes = tauri_build::Attributes::new()
         .app_manifest(tauri_build::AppManifest::new().commands(&[
-            "launcher_status",
+            "launcher_status", "read_log", "open_log_folder",
             "launcher_ready",
             "install_components",
             "save_settings",

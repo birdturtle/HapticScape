@@ -232,7 +232,7 @@ fn deliver(app: &tauri::AppHandle, pending: &Pending, queued: &Path) -> Result<b
         } else {
             vec!["--profile", settings.profile.as_str()]
         };
-        children.hapticscape = Some(processes::spawn(&settings, &jar, &args, &[])?);
+        children.hapticscape = Some(processes::spawn(&settings, &jar, &args, &[], &crate::log_path(app, crate::logs::Kind::Hapticscape)?)?);
     }
     // Removal by Java is the acknowledgement, not merely a busy gameplay port.
     Ok(false)

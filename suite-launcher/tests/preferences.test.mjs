@@ -9,9 +9,9 @@ function launcher(preferences, options = {}) {
   let poll;
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
-      dataset: {}, checked: false, children: [], listeners: {},
+      style: {}, dataset: {}, checked: false, children: [], listeners: {},
       querySelectorAll: () => [],
-      setAttribute() {},
+      setAttribute() {}, removeAttribute() {},
       classList: { toggle() {} },
       elements: { namedItem: (name) => element(`${id}:${name}`) },
       addEventListener(type, callback) { this.listeners[type] = callback; },
@@ -41,7 +41,7 @@ function launcher(preferences, options = {}) {
         status.lumbridgeInstalled = true;
         status.componentMessage = '';
       }
-      if (command === 'install_update' && options.installError) throw options.installError;
+      if (command === 'install_update') { if (options.installGate) await options.installGate; if (options.installError) throw options.installError; }
       if (command === 'save_preferences') status.settings.preferences = args.preferences;
     } } } },
     document: { getElementById: element, querySelectorAll: () => [], createElement: () => element(`option:${Math.random()}`), createElementNS: () => element(`svg:${Math.random()}`) },
@@ -53,22 +53,22 @@ function launcher(preferences, options = {}) {
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 test('accounts load and releases check once; polling preserves unsaved edits', async () => {
-  const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: true });
+  const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: true });
   await settle();
   assert.deepEqual(app.calls.filter((call) => call.command !== 'launcher_status').map((call) => call.command), ['launcher_ready', 'load_accounts', 'check_updates']);
-  app.element('preferences-form:minimizeOnPlay').checked = true;
+  app.element('preferences-form:afterPlay').value = 'closeLauncher';
   await app.poll();
-  assert.equal(app.element('preferences-form:minimizeOnPlay').checked, true);
+  assert.equal(app.element('preferences-form:afterPlay').value, 'closeLauncher');
   assert.equal(app.calls.filter((call) => call.command === 'load_accounts').length, 1);
   assert.equal(app.calls.filter((call) => call.command === 'check_updates').length, 1);
   await app.element('preferences-form').listeners.submit({ preventDefault() {}, currentTarget: app.element('preferences-form') });
   const saved = app.calls.find((call) => call.command === 'save_preferences');
-  assert.equal(saved.args.preferences.minimizeOnPlay, true);
+  assert.equal(saved.args.preferences.afterPlay, 'closeLauncher');
   assert.equal(typeof saved.args.preferences.checkUpdatesOnStartup, 'boolean');
 });
 
 test('accounts always load, while release checks remain opt-in', async () => {
-  const app = launcher({ minimizeOnPlay: false, checkUpdatesOnStartup: false });
+  const app = launcher({ afterPlay: 'keepOpen', checkUpdatesOnStartup: false });
   await settle();
   assert.deepEqual(app.calls.map((call) => call.command), ['launcher_status', 'launcher_ready', 'load_accounts', 'launcher_status']);
 });
@@ -190,4 +190,18 @@ test('first-run download permits account loading, reports failure and retries wi
   assert.equal(app.calls.some((c) => c.command === 'launch_app'), false);
   await app.poll();
   assert.equal(app.calls.filter((c) => c.command === 'install_components').length, 2);
+});
+
+
+test('update download uses real percentages while component downloads use the Play indicator', async () => {
+  const updates = launcher({afterPlay:'keepOpen'}, {status:{updating:true, updateProgress:'Downloading apps and Java… 42%'}});
+  await settle();
+  assert.equal(updates.element('update-progress').hidden, false);
+  assert.equal(updates.element('update-progress').value, 42);
+  assert.equal(updates.element('client-progress').hidden, true);
+  const components = launcher({afterPlay:'keepOpen'}, {status:{updating:true, componentsInstalling:true, componentMessage:'Downloading apps and Java… 27%'}});
+  await settle();
+  assert.equal(components.element('update-progress').hidden, true);
+  assert.equal(components.element('client-progress').hidden, false);
+  assert.equal(components.element('client-progress-fill').style.width, '27%');
 });
