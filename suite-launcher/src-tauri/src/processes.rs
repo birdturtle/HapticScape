@@ -19,12 +19,29 @@ pub struct Settings {
     pub managed_components: bool,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum AfterPlay {
+    #[default]
+    KeepOpen,
+    HideToTray,
+    CloseLauncher,
+}
+#[derive(Clone, Default, Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Preferences {
-    pub minimize_on_play: bool,
+    pub after_play: AfterPlay,
     pub check_updates_on_startup: bool,
     pub include_beta_updates: bool,
+}
+impl<'de> Deserialize<'de> for Preferences {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Default, Deserialize)]
+        #[serde(rename_all = "camelCase", default)]
+        struct Saved { after_play: Option<AfterPlay>, minimize_on_play: bool, check_updates_on_startup: bool, include_beta_updates: bool }
+        let saved = Saved::deserialize(deserializer)?;
+        Ok(Self { after_play: saved.after_play.unwrap_or(if saved.minimize_on_play { AfterPlay::HideToTray } else { AfterPlay::KeepOpen }), check_updates_on_startup: saved.check_updates_on_startup, include_beta_updates: saved.include_beta_updates })
+    }
 }
 
 impl Default for Settings {
@@ -160,6 +177,21 @@ impl Settings {
 pub struct Processes {
     pub hapticscape: Option<Child>,
     pub lumbridge: Option<Child>,
+    pub lumbridge_started: Option<std::time::Instant>,
+    pub launch_error: Option<String>,
+}
+
+impl Processes {
+    pub fn check_startup(&mut self) -> bool {
+        let Some(started) = self.lumbridge_started else { return false; };
+        if started.elapsed() > std::time::Duration::from_secs(20) { self.lumbridge_started = None; return false; }
+        let exit = self.lumbridge.as_mut().and_then(|child| child.try_wait().ok()).flatten();
+        if let Some(exit) = exit {
+            self.lumbridge_started = None; self.lumbridge = None;
+            if !exit.success() { self.launch_error = Some("LumBridge exited during startup. Check its launch log.".into()); return true; }
+        }
+        false
+    }
 }
 
 pub fn running(child: &mut Option<Child>) -> bool {
@@ -195,6 +227,7 @@ pub fn spawn(
     jar: &Path,
     args: &[&str],
     credentials: &[(String, String)],
+    log: &Path,
 ) -> Result<Child, String> {
     let mut command = Command::new(&settings.java_path);
     command.arg("-ea").arg("-jar").arg(jar).args(args);
@@ -210,14 +243,25 @@ pub fn spawn(
     for (name, value) in credentials {
         command.env(name, value);
     }
+    let output = crate::logs::output(log)?;
+    let errors = output.try_clone().map_err(|_| "Cannot open application log.")?;
     // Child applications own their exit lifecycle. No kill-on-drop or launcher close hook.
     command
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::from(output))
+        .stderr(Stdio::from(errors));
     command
         .spawn()
         .map_err(|_| "Java could not start. Check the executable in Settings.".into())
+}
+
+pub fn wait_for_startup(child: &mut Option<Child>, duration: std::time::Duration) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + duration;
+    loop {
+        if !running(child) { return Err("LumBridge closed during startup. Check its launch log.".into()); }
+        if std::time::Instant::now() >= deadline { return Ok(()); }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 }
 
 #[cfg(test)]
@@ -229,12 +273,55 @@ mod tests {
         let mut settings: Settings = serde_json::from_str(old).unwrap();
         assert_eq!(settings.hapticscape_jar, "custom/haptic.jar");
         assert_eq!(settings.preferences, Preferences::default());
-        settings.preferences.minimize_on_play = true;
+        settings.preferences.after_play = AfterPlay::HideToTray;
         settings.preferences.include_beta_updates = true;
         let restored: Settings =
             serde_json::from_slice(&serde_json::to_vec(&settings).unwrap()).unwrap();
         assert_eq!(restored.preferences, settings.preferences);
         assert_eq!(restored.profile, "custom");
+    }
+    #[test]
+    fn after_play_migrates_old_checkboxes_and_keeps_explicit_choices() {
+        let old: Preferences = serde_json::from_str(r#"{"minimizeOnPlay":true,"includeBetaUpdates":true}"#).unwrap();
+        assert_eq!(old.after_play, AfterPlay::HideToTray);
+        assert!(old.include_beta_updates);
+        for choice in [AfterPlay::KeepOpen, AfterPlay::HideToTray, AfterPlay::CloseLauncher] {
+            let value = Preferences { after_play: choice, ..Preferences::default() };
+            let mut json = serde_json::to_value(&value).unwrap();
+            json["minimizeOnPlay"] = serde_json::Value::Bool(true);
+            assert_eq!(serde_json::from_value::<Preferences>(json).unwrap().after_play, choice);
+        }
+        assert!(serde_json::from_str::<Preferences>(r#"{"afterPlay":"killGames"}"#).is_err());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn failed_child_keeps_its_output_and_does_not_pass_startup() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("hapticscape-child-{}", rand::random::<u64>()));
+        fs::create_dir(&root).unwrap();
+        let executable = root.join("fake-java");
+        fs::write(&executable, "#!/bin/sh\necho startup-output\necho startup-error >&2\nexit 7\n").unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+        let mut settings = Settings::default(); settings.java_path = executable.to_string_lossy().into();
+        let log = root.join("logs/lumbridge.log");
+        let mut child = Some(spawn(&settings, &root.join("fake.jar"), &[], &[], &log).unwrap());
+        assert!(wait_for_startup(&mut child, std::time::Duration::from_secs(2)).is_err());
+        let text = fs::read_to_string(&log).unwrap();
+        assert!(text.contains("startup-output")); assert!(text.contains("startup-error"));
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn startup_monitor_reports_failure_but_accepts_normal_exit() {
+        for code in [0, 7] {
+            let mut child = Command::new("sh").args(["-c", &format!("exit {code}")]).spawn().unwrap();
+            child.wait().unwrap();
+            let mut processes = Processes { lumbridge: Some(child), lumbridge_started: Some(std::time::Instant::now()), ..Processes::default() };
+            assert_eq!(processes.check_startup(), code != 0);
+            assert_eq!(processes.launch_error.is_some(), code != 0);
+            assert!(processes.lumbridge.is_none());
+            assert!(!processes.check_startup());
+        }
     }
     #[test]
     fn profile_validation_rejects_paths_and_option_injection() {
@@ -292,7 +379,7 @@ mod tests {
         let new = parent.join("1.1.0.new");
         let mut settings = Settings::for_install(&old);
         settings.profile = "custom".into();
-        settings.preferences.minimize_on_play = true;
+        settings.preferences.after_play = AfterPlay::HideToTray;
         settings.rebase_managed_paths(&new);
         assert_eq!(
             settings.hapticscape_jar,
@@ -304,7 +391,7 @@ mod tests {
         );
         assert_eq!(settings.java_path, Settings::for_install(&new).java_path);
         assert_eq!(settings.profile, "custom");
-        assert!(settings.preferences.minimize_on_play);
+        assert_eq!(settings.preferences.after_play, AfterPlay::HideToTray);
         settings.hapticscape_jar = "/custom/client.jar".into();
         settings.rebase_managed_paths(&old);
         assert_eq!(settings.hapticscape_jar, "/custom/client.jar");

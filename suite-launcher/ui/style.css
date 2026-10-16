@@ -117,3 +117,27 @@ footer { display:flex; align-items:center; justify-content:space-between; gap:16
 .play-controls .play-hint { flex:1; margin:0; }
 .character-group #play { width:auto; min-width:110px; min-height:40px; margin:0; }
 @media(max-width:780px) { .account-controls { grid-template-columns:1fr; gap:14px; } .selection-heading { margin-bottom:14px; } }
+
+.play-controls { position:relative; }
+.client-progress { position:absolute; left:0; right:0; top:-4px; height:3px; overflow:hidden; }
+.client-progress span { display:block; height:100%; width:0; background:var(--accent); transition:width .2s linear; }
+.client-progress.indeterminate span { width:30%; animation:client-progress-sweep 1.4s ease-in-out infinite; }
+@keyframes client-progress-sweep { from { transform:translateX(-100%); } to { transform:translateX(340%); } }
+@media(prefers-reduced-motion:reduce) { .client-progress span { transition:none; } .client-progress.indeterminate span { animation:none; } }
+
+.after-play-row { display:flex; flex-direction:column; gap:8px; margin:12px 0 18px; font-size:13px; max-width:320px; }
+
+#update-progress { display: block; width: 100%; height: 4px; margin: 16px 0; accent-color: var(--accent, #f0a000); }
+#update-progress[hidden] { display: none; }
+#update-progress::-webkit-progress-bar { background: #333; }
+#update-progress::-webkit-progress-value { background: #f0a000; }
+
+
+#logs-panel { margin-top:16px; }
+#logs-panel .log-source-row { display:flex; align-items:center; gap:12px; margin:8px 0 16px; }
+#logs-panel select { appearance:none; -webkit-appearance:none; flex:0 1 320px; width:320px; max-width:100%; height:34px; padding:0 32px 0 10px; line-height:normal; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23f2f2f2' d='M0 0h10L5 6z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; }
+.advanced-divider { height:2px; margin:24px 0; border:0; background:#111; box-shadow:0 1px 0 #383838; }
+#log-content { width:100%; box-sizing:border-box; height:180px; resize:vertical; background:var(--canvas); color:var(--text); border:1px solid var(--border); padding:12px; font:12px monospace; white-space:pre; }
+
+#advanced-settings { margin-top:16px; }
+#advanced-settings > summary { cursor:pointer; color:var(--muted); }

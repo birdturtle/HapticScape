@@ -34,7 +34,7 @@
               <section class="selection-group character-group" aria-labelledby="characters-heading">
                 <div class="selection-heading"><img src="assets/lumbridge.png" alt=""><h3 id="characters-heading">Characters</h3></div>
                 <div id="characters" class="character-list" role="group" aria-label="Characters on the selected account"></div>
-                <div class="play-controls"><p class="play-hint" id="play-hint">Add an account to play.</p><button class="button primary" id="play" disabled>Play</button></div>
+                <div class="play-controls"><div class="client-progress" id="client-progress" role="progressbar" aria-label="Preparing applications" hidden><span id="client-progress-fill"></span></div><button class="button" id="view-error-log" hidden>View log</button><p class="play-hint" id="play-hint">Add an account to play.</p><button class="button primary" id="play" disabled>Play</button></div>
               </section>
             </div>
           </div>
@@ -48,19 +48,25 @@
       </section>
       <section class="page" id="updates" hidden>
         <article class="panel"><div class="panel-heading"><h2>HapticScape releases</h2><button class="button" id="check-updates">Check for updates</button></div><p id="release-summary">Check the latest published release.</p><h3 id="release-name" hidden></h3><pre id="release-notes" hidden></pre></article>
-        <div class="panel"><p id="update-message" role="status" aria-live="polite">Updates include the launcher, both apps, and Java.</p><button class="button primary" id="install-update" hidden>Install update and restart</button></div>
+        <div class="panel"><progress id="update-progress" max="100" aria-label="Update progress" hidden></progress><p id="update-message" role="status" aria-live="polite">Updates include the launcher, both apps, and Java.</p><button class="button primary" id="install-update" hidden>Install update and restart</button></div>
       </section>
       <section class="page" id="settings" hidden>
         <form class="panel preferences-form" id="preferences-form">
           <h2>Launch behavior</h2>
-          <label class="preference-row"><input type="checkbox" name="minimizeOnPlay"><span>Minimize to system tray after Play</span></label>
+          <label class="after-play-row" for="after-play">After Play<select id="after-play" name="afterPlay"><option value="keepOpen">Keep launcher open</option><option value="hideToTray">Hide to system tray</option><option value="closeLauncher">Close launcher</option></select></label>
           <h2>Updates</h2>
           <label class="preference-row"><input type="checkbox" name="checkUpdatesOnStartup"><span>Check for updates when the launcher opens</span></label>
           <label class="preference-row"><input type="checkbox" name="includeBetaUpdates"><span>Include beta updates</span></label>
           <button class="button primary" type="submit">Save preferences</button><p class="help-text">Startup preferences apply next time you open the launcher.</p>
         </form>
         <p class="help-text">Closing the window hides the launcher to the tray. Tray Exit leaves HapticScape and LumBridge running.</p>
-        <details class="troubleshooting"><summary>Troubleshooting</summary>
+        <details id="advanced-settings" class="troubleshooting"><summary>Advanced</summary>
+          <article class="panel" id="logs-panel"><h2>Logs</h2>
+            <label class="log-source-row" for="log-source"><span>Log</span><select id="log-source"><option value="hapticscape">HapticScape</option><option value="lumbridge">LumBridge</option><option value="launcher">Launcher</option></select></label>
+            <div class="action-row"><button class="button" id="refresh-log">Refresh</button><button class="button" id="copy-log">Copy</button><button class="button" id="open-log-folder">Open folder</button></div>
+            <p class="help-text" id="log-note">Logs may include account or character names.</p><textarea id="log-content" aria-label="Log output" readonly spellcheck="false">Select a log to view it.</textarea>
+          </article>
+          <hr class="advanced-divider">
           <form class="panel settings-form" id="settings-form"><h2>Application overrides</h2><p>Change these only if an application cannot be found. Close apps started by this launcher before changing their paths.</p><label>HapticScape JAR<input name="hapticscapeJar" required spellcheck="false"></label><label>LumBridge JAR<input name="lumbridgeJar" required spellcheck="false"></label><label>Java executable<input name="javaPath" required spellcheck="false"></label><label>HapticScape profile<input name="profile" maxlength="32" spellcheck="false"><small>Leave blank for your existing default settings. Gameplay port: 41713</small></label><button class="button" type="submit">Save overrides</button></form>
         </details>
       </section>

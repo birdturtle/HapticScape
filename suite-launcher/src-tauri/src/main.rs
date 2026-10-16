@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod logs;
 mod accounts;
 mod auth;
 mod components;
@@ -10,7 +11,7 @@ mod tray;
 mod updates;
 
 use auth::{AccountState, Callback, Phase};
-use processes::{Preferences, Processes, Settings};
+use processes::{AfterPlay, Preferences, Processes, Settings};
 use serde::Serialize;
 use std::{
     fs,
@@ -34,6 +35,7 @@ struct AppState {
     http: reqwest::Client,
     updating: AtomicBool,
     deep_link_message: Mutex<String>,
+    update_progress: Mutex<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +62,8 @@ struct Status {
     components_needed: bool,
     components_installing: bool,
     component_message: String,
+    launch_error: Option<String>,
+    update_progress: String,
 }
 
 #[derive(Serialize)]
@@ -100,7 +104,38 @@ fn launcher_ready(window: WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 async fn install_components(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
     local(&window)?;
-    components::install(app).await
+    let result = components::install(app.clone()).await;
+    if let Err(error) = &result { if let Ok(path) = log_path(&app, logs::Kind::Launcher) { logs::record(&path, error); } }
+    result
+}
+
+fn log_path(app: &tauri::AppHandle, kind: logs::Kind) -> Result<PathBuf, String> {
+    Ok(kind.path(&app.path().app_log_dir().map_err(|_| "Cannot locate log folder.")?))
+}
+#[tauri::command]
+fn read_log(window: WebviewWindow, app: tauri::AppHandle, state: tauri::State<'_, AppState>, kind: logs::Kind) -> Result<logs::View, String> {
+    local(&window)?;
+    let mut view = logs::read(&log_path(&app, kind)?)?;
+    for account in &state.account.lock().unwrap().book.accounts {
+        for secret in [Some(account.session.session_id.as_str()), Some(account.session.refresh_token.as_str()), account.session.oauth_id_token.as_deref()].into_iter().flatten() {
+            if !secret.is_empty() { view.text = view.text.replace(secret, "[credential omitted]"); }
+        }
+    }
+    Ok(view)
+}
+#[tauri::command]
+fn open_log_folder(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    local(&window)?;
+    let path = log_path(&app, logs::Kind::Launcher)?;
+    let folder = path.parent().ok_or("Cannot locate log folder.")?;
+    fs::create_dir_all(folder).map_err(|_| "Cannot create log folder.")?;
+    #[cfg(windows)] let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(not(windows))] let mut command = std::process::Command::new("xdg-open");
+    command.arg(folder);
+    for (name, _) in std::env::vars_os() { if name.to_string_lossy().starts_with("JX_") { command.env_remove(name); } }
+    for name in ["LD_LIBRARY_PATH", "LD_PRELOAD", "APPIMAGE", "APPDIR", "ARGV0"] { command.env_remove(name); }
+    command.spawn().map_err(|_| "Cannot open log folder.")?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -112,8 +147,11 @@ async fn launcher_status(
     local(&window)?;
     let settings = state.settings.lock().unwrap().clone();
     let mut processes = state.processes.lock().unwrap();
+    if processes.check_startup() { let _ = window.show(); let _ = window.unminimize(); let _ = window.set_focus(); }
     let account = state.account.lock().unwrap();
+    let update_progress = state.update_progress.lock().unwrap().clone();
     Ok(Status {
+        launch_error: processes.launch_error.clone(),
         hapticscape_installed: PathBuf::from(&settings.hapticscape_jar).is_file(),
         lumbridge_installed: PathBuf::from(&settings.lumbridge_jar).is_file(),
         hapticscape_running: processes::running(&mut processes.hapticscape),
@@ -148,8 +186,10 @@ async fn launcher_status(
         deep_link_message: state.deep_link_message.lock().unwrap().clone(),
         components_needed: state.components.needed(),
         components_installing: state.components.root.is_some()
-            && state.updating.load(Ordering::SeqCst),
+            && state.updating.load(Ordering::SeqCst)
+            && update_progress.is_empty(),
         component_message: state.components.message.lock().unwrap().clone(),
+        update_progress,
         settings,
         platform: std::env::consts::OS,
         installed_version: app.package_info().version.to_string(),
@@ -280,15 +320,10 @@ async fn launch_app(
     if mode != "hapticscape" && mode != "play" {
         return Err("Unknown launch action.".into());
     }
-    let minimize = mode == "play"
-        && app
-            .state::<AppState>()
-            .settings
-            .lock()
-            .unwrap()
-            .preferences
-            .minimize_on_play;
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    let after_play = if mode == "play" { app.state::<AppState>().settings.lock().unwrap().preferences.after_play } else { AfterPlay::KeepOpen };
+    let launch_app = app.clone();
+    let result: Result<String, String> = tauri::async_runtime::spawn_blocking(move || {
+        let app = launch_app;
         let state = app.state::<AppState>(); let _launch = state.launches.lock().unwrap();
         if state.updating.load(Ordering::SeqCst) { return Err("Wait for the update to finish before launching apps.".into()); }
         let settings = state.settings.lock().unwrap().clone(); settings.validate()?;
@@ -299,27 +334,34 @@ async fn launch_app(
         } else { Vec::new() };
         let lumbridge = if mode == "play" { Some(processes::snapshot(&PathBuf::from(&settings.lumbridge_jar), &cache)?) } else { None };
         let mut children = state.processes.lock().unwrap();
+        children.launch_error = None;
         if mode == "play" && processes::running(&mut children.lumbridge) { return Ok("LumBridge is already running.".into()); }
         if !processes::running(&mut children.hapticscape) {
             if port_busy() { return Err("Port 41713 is in use. Close the other HapticScape client before launching this profile.".into()); }
             let jar = processes::snapshot(&PathBuf::from(&settings.hapticscape_jar), &cache)?;
             let profile_args = if settings.profile.is_empty() { Vec::new() } else { vec!["--profile", settings.profile.as_str()] };
-            children.hapticscape = Some(processes::spawn(&settings, &jar, &profile_args, &[])?);
+            children.hapticscape = Some(processes::spawn(&settings, &jar, &profile_args, &[], &log_path(&app, logs::Kind::Hapticscape)?)?);
         }
         let deadline = Instant::now() + Duration::from_secs(15);
         while !port_busy() {
-            if !processes::running(&mut children.hapticscape) { return Err("HapticScape exited before its gameplay bridge became ready.".into()); }
+            if !processes::running(&mut children.hapticscape) { return Err("HapticScape exited before its gameplay bridge became ready. Check its launch log.".into()); }
             if Instant::now() >= deadline { return Err("HapticScape is still starting. Try again once its window is ready.".into()); }
             std::thread::sleep(Duration::from_millis(100));
         }
-        if let Some(jar) = lumbridge { children.lumbridge = Some(processes::spawn(&settings, &jar, &[], &credentials)?); }
+        if let Some(jar) = lumbridge { children.lumbridge = Some(processes::spawn(&settings, &jar, &[], &credentials, &log_path(&app, logs::Kind::Lumbridge)?)?);
+            processes::wait_for_startup(&mut children.lumbridge, Duration::from_secs(2))?;
+            children.lumbridge_started = Some(Instant::now());
+        }
         Ok(if mode == "play" { "HapticScape and LumBridge launched." } else { "HapticScape is ready." }.into())
     }).await.map_err(|_| "The launch task failed.".to_string())?;
-    if minimize && result.is_ok() {
-        if tray::available(window.app_handle()) {
-            let _ = window.hide();
-        } else {
-            let _ = window.minimize();
+    if let Err(error) = &result {
+        if let Ok(path) = log_path(&app, logs::Kind::Launcher) { logs::record(&path, error); }
+        let _ = window.show(); let _ = window.unminimize(); let _ = window.set_focus();
+    } else {
+        match after_play {
+            AfterPlay::KeepOpen => {},
+            AfterPlay::HideToTray => { if tray::available(window.app_handle()) { let _ = window.hide(); } else { let _ = window.minimize(); } },
+            AfterPlay::CloseLauncher => app.exit(0),
         }
     }
     result
@@ -659,7 +701,12 @@ async fn check_updates(
 }
 
 #[tauri::command]
-async fn install_update(
+async fn install_update(window: WebviewWindow, app: tauri::AppHandle, tag: String) -> Result<(), String> {
+    let result = perform_update(window, app.clone(), tag).await;
+    if let Err(error) = &result { if let Ok(path) = log_path(&app, logs::Kind::Launcher) { logs::record(&path, error); } }
+    result
+}
+async fn perform_update(
     window: WebviewWindow,
     app: tauri::AppHandle,
     tag: String,
@@ -669,13 +716,15 @@ async fn install_update(
     if state.updating.swap(true, Ordering::SeqCst) {
         return Err("An update is already in progress.".into());
     }
-    struct Reset<'a>(&'a AtomicBool);
+    *state.update_progress.lock().unwrap() = "Preparing update…".into();
+    struct Reset<'a>(&'a AtomicBool, &'a Mutex<String>);
     impl Drop for Reset<'_> {
         fn drop(&mut self) {
             self.0.store(false, Ordering::SeqCst);
+            self.1.lock().unwrap().clear();
         }
     }
-    let _reset = Reset(&state.updating);
+    let _reset = Reset(&state.updating, &state.update_progress);
     let install = updates::install_root(
         &std::env::current_exe().map_err(|_| "Cannot locate the installed launcher.")?,
     )?;
@@ -721,7 +770,12 @@ async fn install_update(
     {
         return Err("There is no compatible newer suite update.".into());
     }
-    let staged = updates::stage(&release, &install).await?;
+    *state.update_progress.lock().unwrap() = "Preparing update…".into();
+    let progress_app = app.clone();
+    let staged = updates::stage_with_progress(&release, &install, std::sync::Arc::new(move |message| {
+        *progress_app.state::<AppState>().update_progress.lock().unwrap() = message.into();
+    })).await?;
+    *state.update_progress.lock().unwrap() = "Installing update and restarting…".into();
     let staged_copy = staged.clone();
     let install_copy = install.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -820,6 +874,7 @@ fn main() {
                 launches: Mutex::new(()),
                 updating: AtomicBool::new(false),
                 deep_link_message: Mutex::new(String::new()),
+                update_progress: Mutex::new(String::new()),
                 http: reqwest::Client::builder()
                     .timeout(Duration::from_secs(25))
                     .redirect(reqwest::redirect::Policy::none())
@@ -845,6 +900,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             launcher_status,
+            read_log,
+            open_log_folder,
             launcher_ready,
             install_components,
             save_settings,

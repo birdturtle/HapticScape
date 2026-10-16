@@ -3,6 +3,9 @@ let status;
 let busy = false;
 let starting = false;
 let installingComponents = false;
+let installingUpdate = false;
+let failedLog = null;
+let lastStartupError = null;
 let updateRelease;
 let checkingUpdates = false;
 let updateFeedback = false;
@@ -14,6 +17,7 @@ function page(name) {
   document.querySelectorAll('.page').forEach((element) => { element.hidden = element.id !== name; });
   document.querySelectorAll('[data-page]').forEach((element) => element.classList.toggle('active', element.dataset.page === name));
   $('page-name').textContent = name[0].toUpperCase() + name.slice(1);
+  if (name === 'settings' && $('advanced-settings').open) refreshLog();
 }
 
 function toast(message, error = false) {
@@ -28,7 +32,9 @@ async function action(command, args = {}) {
   if (busy) return;
   if (!invoke) { toast('Open the desktop launcher to use this action.', true); return; }
   busy = true;
-  starting = command === 'launch_app' && args.mode === 'play';
+  starting = command === 'launch_app';
+  installingUpdate = command === 'install_update';
+  if (command === 'launch_app') failedLog = null;
   render();
   document.querySelectorAll('button').forEach((button) => { if (!button.dataset.page && !button.dataset.go) button.disabled = true; });
   try {
@@ -40,19 +46,34 @@ async function action(command, args = {}) {
     return result;
   } catch (error) {
     toast(error, true);
+    if (command === 'launch_app') failedLog = /lumbridge/i.test(String(error)) ? 'lumbridge' : 'hapticscape';
     if (command === 'check_updates' || command === 'install_update') {
       updateFeedback = true;
       $('update-message').textContent = String(error);
       if (command === 'check_updates') $('release-summary').textContent = 'Update check failed. Try again.';
     }
   }
-  finally { busy = false; starting = false; render(); }
+  finally { busy = false; starting = false; installingUpdate = false; if (command === 'install_update') await refresh(); render(); }
 }
 
 function render() {
   document.querySelectorAll('button').forEach((button) => { button.disabled = busy && !button.dataset.page && !button.dataset.go; });
   $('play').textContent = starting ? 'Starting…' : installingComponents || status?.componentsInstalling ? 'Installing…' : status?.componentsNeeded ? 'Retry installation' : 'Play';
   $('check-updates').textContent = checkingUpdates ? 'Checking…' : 'Check for updates';
+  if (status?.launchError && status.launchError !== lastStartupError) { failedLog = 'lumbridge'; toast(status.launchError, true); }
+  lastStartupError = status?.launchError || null;
+  $('view-error-log').hidden = !failedLog;
+  const updating = installingUpdate || (status?.updating && !status?.componentsInstalling);
+  const updateBar = $('update-progress'); updateBar.hidden = !checkingUpdates && !updating;
+  const percent = status?.updateProgress?.match(/(\d+)%/);
+  if (updating && percent) updateBar.value = Math.min(100, Number(percent[1])); else updateBar.removeAttribute('value');
+  if (updating && status?.updateProgress) $('update-message').textContent = status.updateProgress;
+  const preparing = starting || installingComponents || status?.componentsInstalling;
+  const progress = $('client-progress'); progress.hidden = !preparing;
+  const componentPercent = status?.componentMessage?.match(/(\d+)%/);
+  progress.classList.toggle('indeterminate', preparing && !componentPercent);
+  if (preparing && componentPercent) { const value = Math.min(100, Number(componentPercent[1])); $('client-progress-fill').style.width = `${value}%`; progress.setAttribute('aria-valuenow', String(value)); }
+  else { $('client-progress-fill').style.width = ''; progress.removeAttribute('aria-valuenow'); }
   if (!status) return;
   $('installed-version').textContent = status.installedVersion || '';
   $('install-update').disabled = busy || status.updating || status.hapticscapeRunning || status.lumbridgeRunning || status.gameplayPortBusy;
@@ -66,8 +87,8 @@ function render() {
     $(id).className = `app-status ${running ? 'running' : installed ? '' : 'missing'}`;
   }
   const character = status.characters.find((item) => item.accountId === status.selectedCharacter);
-  $('play-hint').textContent = status.componentsNeeded || installingComponents ? status.componentMessage || 'Preparing downloads…' : status.gameplayPortBusy && !status.hapticscapeRunning ? 'Gameplay port is in use. Close the other HapticScape client first.'
-    : status.lumbridgeRunning ? 'LumBridge is running.' : !status.hapticscapeInstalled || !status.lumbridgeInstalled ? 'Set application paths in Settings.' : character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.';
+  $('play-hint').textContent = status.componentsNeeded || installingComponents ? status.componentMessage || 'Preparing downloads…' : status.launchError || (status.gameplayPortBusy && !status.hapticscapeRunning ? 'Gameplay port is in use. Close the other HapticScape client first.'
+    : status.lumbridgeRunning ? 'LumBridge is running.' : !status.hapticscapeInstalled || !status.lumbridgeInstalled ? 'Set application paths in Settings.' : character ? '' : status.accounts.length ? 'Choose a character to play.' : 'Add an account to play.');
   $('play').disabled = busy || installingComponents || status.updating || (!status.componentsNeeded && (!status.hapticscapeInstalled || !status.lumbridgeInstalled || !character || status.lumbridgeRunning));
   $('open-haptic').disabled = busy || status.updating || status.componentsNeeded || !status.hapticscapeInstalled || status.hapticscapeRunning;
   $('sign-in').disabled = busy || status.signingIn;
@@ -126,7 +147,7 @@ async function refresh() {
       $('settings-form').dataset.loaded = 'true';
     }
     if (!$('preferences-form').dataset.loaded) {
-      for (const [key, value] of Object.entries(status.settings.preferences)) $('preferences-form').elements.namedItem(key).checked = value;
+      for (const [key, value] of Object.entries(status.settings.preferences)) { const input = $('preferences-form').elements.namedItem(key); if (!input) continue; if (key === 'afterPlay') input.value = value; else input.checked = value; }
       $('preferences-form').dataset.loaded = 'true';
     }
     render();
@@ -141,7 +162,8 @@ $('open-haptic').addEventListener('click', () => action('launch_app', { mode: 'h
 for (const [id, command] of [['sign-in', 'begin_login'], ['cancel-login', 'cancel_login']]) $(id).addEventListener('click', () => action(command));
 $('preferences-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const preferences = Object.fromEntries(['minimizeOnPlay', 'checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
+  const preferences = Object.fromEntries(['checkUpdatesOnStartup', 'includeBetaUpdates'].map((key) => [key, event.currentTarget.elements.namedItem(key).checked]));
+  preferences.afterPlay = event.currentTarget.elements.namedItem('afterPlay').value;
   await action('save_preferences', { preferences });
   updateRelease = undefined;
   $('install-update').hidden = true;
@@ -217,3 +239,27 @@ async function initialize() {
 initialize(); setInterval(refresh, 2000);
 
 $('reauthenticate').addEventListener('click', () => action('begin_login'));
+
+let logRevision = 0;
+async function refreshLog() {
+  if (!invoke) return;
+  const revision = ++logRevision;
+  try {
+    const result = await invoke('read_log', {kind:$('log-source').value});
+    if (revision !== logRevision) return;
+    $('log-content').value = result.text;
+    $('log-note').textContent = `${result.truncated ? 'Showing recent output. ' : ''}Logs may include account or character names.`;
+  } catch (error) { if (revision === logRevision) toast(error, true); }
+}
+$('advanced-settings').addEventListener('toggle', () => { if ($('advanced-settings').open) refreshLog(); });
+$('log-source').addEventListener('change', refreshLog);
+$('refresh-log').addEventListener('click', refreshLog);
+$('open-log-folder').addEventListener('click', () => action('open_log_folder', {}));
+$('copy-log').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('log-content').value); toast('Log copied.'); }
+  catch { $('log-content').focus(); $('log-content').select(); toast('Select and copy the log text.', true); }
+});
+$('view-error-log').addEventListener('click', () => {
+  $('log-source').value = failedLog || 'launcher'; $('advanced-settings').open = true;
+  page('settings'); $('logs-panel').scrollIntoView({block:'start'});
+});
