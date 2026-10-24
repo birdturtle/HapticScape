@@ -48,6 +48,7 @@ def approvedRuntimeModules = [
     'net.runelite:flatlaf',
     'net.runelite:flatlaf-extras',
     'net.runelite:injected-client',
+    'net.runelite:jagexauth',
     'net.runelite:jshell',
     'net.runelite:rlawt',
     'net.runelite:rlicn',
