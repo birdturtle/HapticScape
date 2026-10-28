@@ -104,6 +104,17 @@ class ReleaseTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == 'nt', 'The publish job uses Bash on Linux')
     def test_publish_creates_draft_and_fetches_it_by_id_before_publication(self):
+        self.publish_job(notes=True)
+
+    @unittest.skipIf(os.name == 'nt', 'The publish job uses Bash on Linux')
+    def test_publish_without_notes_generates_notes_and_verifies_assets(self):
+        self.publish_job(notes=False)
+
+    @unittest.skipIf(os.name == 'nt', 'The publish job uses Bash on Linux')
+    def test_existing_draft_without_notes_can_finish_publication(self):
+        self.publish_job(notes=False, existing=True)
+
+    def publish_job(self, notes, existing=False):
         self.assemble()
         repository = Path(__file__).resolve().parents[2]
         work = self.root / 'publish-job'
@@ -113,8 +124,11 @@ class ReleaseTests(unittest.TestCase):
         shutil.copyfile(repository / 'packaging/release/prepare.py', work / 'packaging/release/prepare.py')
         (work / 'runelite-bridge-client').mkdir()
         (work / 'runelite-bridge-client/RUNTIME.properties').write_text('runeLiteVersion=' + self.pin)
-        (work / 'docs/releases').mkdir(parents=True)
-        (work / f'docs/releases/{self.version}.md').write_text('Release notes')
+        if notes:
+            (work / 'docs/releases').mkdir(parents=True)
+            (work / f'docs/releases/{self.version}.md').write_text('Release notes')
+        if existing:
+            (work / 'draft-created').touch()
         metadata = {'draft': True, 'tag_name': 'v' + self.version, 'assets': [
             {'name': p.name, 'digest': 'sha256:' + hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in self.output.iterdir()]}
@@ -125,12 +139,18 @@ class ReleaseTests(unittest.TestCase):
         stub.write_text('#!' + sys.executable + '\n' + textwrap.dedent("""
             import json, pathlib, sys
             args = sys.argv[1:]
+            with pathlib.Path('gh-calls.jsonl').open('a') as calls:
+                calls.write(json.dumps(args) + '\\n')
             state = pathlib.Path('draft-created')
             if args[:2] == ['release', 'view']:
                 if not state.exists(): sys.exit(1)
                 print('true' if 'isDraft' in args else '12345')
             elif args[:2] == ['release', 'create']:
                 assert '--draft' in args
+                if '--notes-file' in args:
+                    assert pathlib.Path(args[args.index('--notes-file') + 1]).is_file()
+                else:
+                    assert '--generate-notes' in args
                 state.touch()
             elif args[:2] == ['release', 'upload']:
                 assert state.exists()
@@ -149,6 +169,26 @@ class ReleaseTests(unittest.TestCase):
         result = subprocess.run(['bash', '-c', script], cwd=work, env=dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'], RELEASE_TAG='v' + self.version, GH_REPO='fixture/repo', RUNNER_TEMP=str(work)), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((work / 'published').is_file())
+        calls = [json.loads(line) for line in (work / 'gh-calls.jsonl').read_text().splitlines()]
+        creates = [args for args in calls if args[:2] == ['release', 'create']]
+        if existing:
+            self.assertEqual(creates, [])
+        else:
+            self.assertEqual(len(creates), 1)
+            self.assertIn('--notes-file' if notes else '--generate-notes', creates[0])
+        if not notes:
+            self.assertFalse(any('--notes-file' in args for args in calls))
+
+    def test_tag_validation_does_not_require_a_notes_file(self):
+        repository = Path(__file__).resolve().parents[2]
+        script = self.root / 'packaging/release/prepare.py'
+        script.parent.mkdir(parents=True)
+        shutil.copyfile(repository / 'packaging/release/prepare.py', script)
+        (self.root / 'runelite-bridge-client').mkdir()
+        (self.root / 'runelite-bridge-client/RUNTIME.properties').write_text('runeLiteVersion=' + self.pin)
+        result = subprocess.run([sys.executable, str(script), 'v3.2.4'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Validated HapticScape 3.2.4', result.stdout)
 
     def test_versions_require_three_components_and_reject_paths(self):
         self.assertEqual(version('v3.2.2'), '3.2.2')

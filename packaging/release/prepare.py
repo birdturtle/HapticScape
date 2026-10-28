@@ -129,9 +129,6 @@ def main():
         verify_bridge(args.package, pin)
         print(f'Packaged RuneLite matches {pin}')
         return
-    notes = root / 'docs/releases' / f'{v}.md'
-    if not notes.is_file() or not notes.read_text().strip():
-        raise ValueError(f'Missing release notes: {notes.relative_to(root)}')
     if args.uploaded:
         if not args.output:
             raise ValueError('Provide --output containing the prepared assets')
